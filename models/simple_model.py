@@ -52,7 +52,6 @@ class SimpleModel(BaseModel):
     def set_input(self, input):
         AtoB = self.opt.direction == 'AtoB'
         self.real_A_cor = input['A' if AtoB else 'B'].float().to(self.device)
-
         if self.isTrain:
             self.real_B_cor = input['B' if AtoB else 'A'].float().to(self.device)
             self.real_C_cor = input['C'].float().to(self.device)

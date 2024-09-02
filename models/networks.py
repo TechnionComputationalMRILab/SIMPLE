@@ -118,7 +118,7 @@ def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
     """
     if len(gpu_ids) > 1:
         assert(torch.cuda.is_available())
-        print("Let's use", torch.cuda.device_count(), "GPUs!")
+        print("Let's use", len(gpu_ids), "GPUs!", gpu_ids)
         net = torch.nn.DataParallel(net, gpu_ids)
     device = torch.device(f"cuda:{gpu_ids[0]}" if torch.cuda.is_available() else "cpu")
     net.to(device)

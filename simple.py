@@ -8,22 +8,19 @@ from data.preprocess import reconstruct_volume, pad_volume
 from models import create_model
 from util.visualizer import Visualizer, plot_simple_train_results, plot_simple_test_results
 from util.util import mkdir, mkdirs
-from options.train_simple_options import TrainSimpleOptions
+from options.simple_options import SimpleOptions
 
 
 torch.manual_seed(13)
 random.seed(13)
 np.random.seed(13)
 
-def setup(opt):
-    mkdir(opt.main_root)
-    mkdir(os.path.join(opt.main_root, opt.simple_root, opt.exp_name))
-    mkdir(os.path.join(opt.main_root, opt.atme_cor_root, opt.exp_name))
-    mkdir(os.path.join(opt.main_root, opt.atme_ax_root, opt.exp_name))
-
 
 def train(opt):
+    opt.isTrain = True
+
     opt.save_dir = os.path.join(opt.main_root, opt.simple_root, opt.exp_name)
+    mkdir(opt.save_dir)
 
     model = create_model(opt)
     model.setup(opt)
@@ -81,6 +78,7 @@ def train(opt):
 
 def test(opt):
     opt.isTrain = False
+
     opt.save_dir = os.path.join(opt.main_root, opt.simple_root, opt.exp_name)
     opt.data_dir = os.path.join(opt.main_root, opt.simple_root, opt.data_name)
     figures_path = os.path.join(opt.save_dir, 'figures', 'test')
@@ -121,7 +119,7 @@ def test(opt):
 
 
 if __name__ == '__main__':
-    simple_opt = TrainSimpleOptions().parse()
+    simple_opt = SimpleOptions().parse()
     if simple_opt.isTrain:
         train(simple_opt)
     else:

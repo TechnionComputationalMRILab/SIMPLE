@@ -1,28 +1,35 @@
 from data.preprocess import organize_data
-from options.train_atme_options import TrainAtmeOptions
-from options.train_simple_options import TrainSimpleOptions
+from options.atme_options import AtmeOptions
+from options.simple_options import SimpleOptions
 import atme
 import simple
+import argparse
+
 
 if __name__ == '__main__':
-    simple_opt = TrainSimpleOptions().parse()
 
-    simple.setup(simple_opt)
+    main_parser = argparse.ArgumentParser(description="Main parser with subparsers")
+    subparsers = main_parser.add_subparsers(dest="model")
 
-    organize_data(simple_opt)
+    parser1 = subparsers.add_parser(name="atme")
+    parser2 = subparsers.add_parser(name="simple")
 
-    # Coronal ATME
-    # atme_opt = TrainAtmeOptions().parse()
-    # atme_opt.plane = 'coronal'
-    # atme_opt.atme_root = atme_opt.atme_cor_root
-    # atme.train(atme_opt)
-    # atme.test(atme_opt)
+    atme_opt = AtmeOptions().parse(parser1)
+    simple_opt = SimpleOptions().parse(parser2)
 
-    # Axial ATME
-    # atme_opt.plane = 'axial'
-    # atme_opt.atme_root = atme_opt.atme_ax_root
-    # atme.train(atme_opt)
-    # atme.test(atme_opt)
+    opt = main_parser.parse_args()
 
-    # SIMPLE
-    simple.train(simple_opt)
+    organize_data(opt)
+
+    if opt.model == "atme":
+        AtmeOptions().print_options(atme_opt)
+        if atme_opt.isTrain:
+            atme.train(atme_opt)
+            if opt.TestAfterTrain: atme.test(atme_opt)
+        else:
+            atme.test(atme_opt)
+    elif opt.model == "simple":
+        SimpleOptions().print_options(simple_opt)
+        simple.train(simple_opt)
+    else:
+        print(f'model {opt.model} is not exist!')

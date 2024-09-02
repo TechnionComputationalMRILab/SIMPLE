@@ -14,7 +14,7 @@ Example:
     Train a pix2pix model:
         python train.py --dataroot ./datasets/facades --name facades_pix2pix --model pix2pix --direction BtoA
 
-See options/base_atme_options.py and options/train_atme_options.py for more training options.
+See options/base_options.py and options/atme_options.py for more training options.
 See training and test tips at: https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/docs/tips.md
 See frequently asked questions at: https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/docs/qa.md
 """
@@ -26,7 +26,8 @@ import numpy as np
 from data import create_atme_train_dataset, create_atme_test_dataset
 from models import create_model
 from util.visualizer import Visualizer, save_atme_images
-from options.train_atme_options import TrainAtmeOptions
+from options.atme_options import AtmeOptions
+from util.util import mkdir, mkdirs
 
 
 torch.manual_seed(13)
@@ -35,9 +36,11 @@ np.random.seed(13)
 
 def train(opt):
     opt.isTrain = True
+
     opt.save_dir = os.path.join(opt.main_root, opt.atme_root, opt.exp_name)
     opt.data_dir = os.path.join(opt.main_root, opt.atme_root, opt.data_name)
-    save_fig_dir = os.path.join(opt.save_dir, 'train_figures')
+    save_fig_dir = os.path.join(opt.save_dir, 'figures', 'train')
+    mkdirs([opt.save_dir, opt.data_dir, save_fig_dir])
 
     dataset = create_atme_train_dataset(opt)
     dataset_size = len(dataset)
@@ -105,7 +108,8 @@ def test(opt):
     opt.save_dir = os.path.join(opt.main_root, opt.atme_root, opt.exp_name)
     opt.data_dir = os.path.join(opt.main_root, opt.atme_root, opt.data_name)
 
-    save_fig_dir = os.path.join(opt.save_dir, 'test_figures')
+    save_fig_dir = os.path.join(opt.save_dir, 'figures', 'test')
+    mkdir(save_fig_dir)
 
     cases_paths = torch.load(os.path.join(opt.main_root, f'coronal_cases_paths.pt'))
 
@@ -140,7 +144,7 @@ def test(opt):
 
 
 if __name__ == '__main__':
-    atme_opt = TrainAtmeOptions().parse()
+    atme_opt = AtmeOptions().parse()
     if atme_opt.isTrain:
         train(atme_opt)
     else:

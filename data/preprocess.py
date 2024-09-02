@@ -113,7 +113,7 @@ def extract_volume_from_dicom(case_path):
     img_nda = minmax_scaler(img_nda, vmin=-1, vmax=1)
     interp_img_nda = minmax_scaler(interp_img_nda, vmin=-1, vmax=1)
 
-    return img, interp_img, torch.from_numpy(img_nda), torch.from_numpy(interp_img_nda)
+    return img, interp_img, torch.from_numpy(img_nda).to(torch.float32), torch.from_numpy(interp_img_nda).to(torch.float32)
 
 def extract_patches_with_overlap(volume, patch_size=64, overlap_ratio=0.125):
     patches = []
@@ -283,11 +283,10 @@ def simple_train_preprocess(opt):
 
     cases_num = len(cor_cases_paths)
 
-    opt.save_dir = os.path.join(opt.main_root, opt.simple_root)
     opt.data_dir = os.path.join(opt.main_root, opt.simple_root, 'data')
     save_train_dir = os.path.join(opt.data_dir, 'train')
 
-    mkdirs([opt.save_dir, opt.data_dir, save_train_dir])
+    mkdirs([opt.data_dir, save_train_dir])
 
     save_idx = 0
 
@@ -295,6 +294,7 @@ def simple_train_preprocess(opt):
         cor_case = cor_cases_paths[case_idx]
 
         _, _, _, interp_vol_nda = extract_volume_from_dicom(cor_case)
+        interp_vol_nda = interp_vol_nda.cpu().detach()
         cor_atme_vol = torch.load(os.path.join(opt.main_root, opt.atme_cor_root, 'data', 'generation', f'case_{case_idx}', 'atme_vol.pt')).cpu().detach()
         ax_atme_vol = torch.load(os.path.join(opt.main_root, opt.atme_ax_root, 'data', 'generation', f'case_{case_idx}', 'atme_vol.pt')).cpu().detach()
 
@@ -313,6 +313,10 @@ def simple_train_preprocess(opt):
             interp_patch = interp_patches[i]['patch'].unsqueeze(0).clone()
             cor_atme_patch = cor_atme_patches[i]['patch'].unsqueeze(0).clone()
             ax_atme_patch = ax_atme_patches[i]['patch'].unsqueeze(0).clone()
+
+            # print(f'{interp_patch.dtype=}, {interp_patch.element_size()=}, {interp_patch.nelement()=}')
+            # print(f'{cor_atme_patch.dtype=}, {cor_atme_patch.element_size()=}, {cor_atme_patch.nelement()=}')
+            # print(f'{ax_atme_patch.dtype=}, {ax_atme_patch.element_size()=}, {ax_atme_patch.nelement()=}')
 
             data = {'interp_patch': interp_patch, 'cor_atme_patch': cor_atme_patch, 'ax_atme_patch': ax_atme_patch}
 
