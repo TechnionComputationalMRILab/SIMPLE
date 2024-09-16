@@ -1,3 +1,4 @@
 
 data/dicom_organize.py
 outputs/*
+*.pyc
