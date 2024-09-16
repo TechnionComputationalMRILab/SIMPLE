@@ -19,9 +19,11 @@ To use this project, use the following steps:
    conda env create -f environment.yml
    
 ## Pre-Processing
-organize_data() is an internal method in data/preprocess.py for extracting matching pairs of coronal and axial FIESTA DICOM cases. This method should be written according to the organization of your raw data. The method should return 2 files: 'coronal_cases_paths.pt' and 'axial_cases_paths.pt' - each one of them contains a list of matching coronal or axial cases respectively.
-In case your raw data is not saved in DICOM format, please adapt also the method extract_volume_from_dicom().
-
+You should provide a csv file that contains a table with 2 or 3 columns.
+Each column represents the path for the MRI case (in dicom of nifti format) of specific plane. The column name can be 'coronal'/'axial'/'sagittal'.
+Each row represents the cases for specific patient.
+For eaxample:
+![image](figures/model_arch_with_loss.png)
 ## Training
 This project contains 2 models: ATME and SIMPLE.
 
