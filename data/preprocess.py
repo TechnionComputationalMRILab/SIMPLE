@@ -1,33 +1,26 @@
 import SimpleITK as sitk
 from util.util import mkdir, mkdirs
-import matplotlib.pyplot as plt
+import pandas as pd
 import numpy as np
 import torch
 import os
-import re
-
-
-EXCLUDE_CASES = ['1809432969308/20190902/cor 2D FIESTA (7)', '3413257422381/20181012/cor 2D FIESTA (5)',
-                 '3842830969373/20180601/cor 2D FIESTA (4)', '3554556187316/20200224/cor 2D FIESTA (4)',
-                 '3196140605214/20201223/cor 2D FIESTA (4)', '3104779470389/20190508/Ax 2D FIESTA (5)',
-                 '3239335163204/20201021/Ax 2D FIESTA (3)', '3401307597322/20200103/Ax 2D FIESTA (3)',
-                 '3472726507223/20190222/Ax 2D FIESTA (4)']
 
 
 def minmax_scaler(arr, *, vmin=0, vmax=1):
     arr_min, arr_max = arr.min(), arr.max()
     return ((arr - arr_min) / (arr_max - arr_min)) * (vmax - vmin) + vmin
 
-def convert_image_range(itk_image, min_clamp_val, max_clamp_val): #check pixel ID (GetPixelID())
-    clamper = sitk.ClampImageFilter()
-    clamper.SetLowerBound(float(min_clamp_val))
-    clamper.SetUpperBound(float(max_clamp_val))
-    clamped_image = clamper.Execute(itk_image)
+def convert_image_range(itk_image, min_clamp_val, max_clamp_val, clamp_en=False): #check pixel ID (GetPixelID())
+    if clamp_en:
+        clamper = sitk.ClampImageFilter()
+        clamper.SetLowerBound(float(min_clamp_val))
+        clamper.SetUpperBound(float(max_clamp_val))
+        itk_image = clamper.Execute(itk_image)
 
     converter = sitk.RescaleIntensityImageFilter()
     converter.SetOutputMinimum(0)
     converter.SetOutputMaximum(255)
-    converted_image = converter.Execute(clamped_image)
+    converted_image = converter.Execute(itk_image)#(clamped_image)
     image = sitk.Cast(converted_image, sitk.sitkUInt8)
 
     return image
@@ -57,55 +50,12 @@ def resample_image(itk_image):
 
     return resample.Execute(itk_image)
 
-def organize_data(opt): #should be different according to the dataset
-    if os.path.exists(os.path.join(opt.main_root, 'axial_cases_paths.pt')) and \
-            os.path.exists(os.path.join(opt.main_root, 'coronal_cases_paths.pt')): return
-
-    ax_cases_paths = []
-    cor_cases_paths = []
-    for d1 in os.listdir(opt.dataroot):
-        if str(d1) == 'metadata.db': continue
-        for d2 in os.listdir(os.path.join(opt.dataroot, str(d1))):
-            max_ax_serial_num = 0
-            max_cor_serial_num = 0
-            ax_case = ''
-            cor_case = ''
-            for d3 in os.listdir(os.path.join(opt.dataroot, str(d1), str(d2))):
-                if os.path.join(str(d1), str(d2), str(d3)) in EXCLUDE_CASES: continue
-                d3_arr = d3.split()
-                if len(d3_arr) < 3 or len(d3_arr) > 4: continue
-                if 'fiesta' not in d3_arr[2].lower() and 'fiesta' not in d3_arr[1].lower(): continue
-                if 'ax' in d3_arr[0].lower():
-                    pattern = r'[()]'
-                    result = re.split(pattern, d3_arr[-1])
-                    ax_serial_num = int(result[1])
-                    if ax_serial_num >= max_ax_serial_num:
-                        max_ax_serial_num = ax_serial_num
-                        ax_case = os.path.join(opt.dataroot, str(d1), str(d2), str(d3))
-                if 'cor' in d3_arr[0].lower():
-                    pattern = r'[()]'
-                    result = re.split(pattern, d3_arr[-1])
-                    cor_serial_num = int(result[1])
-                    if cor_serial_num >= max_cor_serial_num:
-                        max_cor_serial_num = cor_serial_num
-                        cor_case = os.path.join(opt.dataroot, str(d1), str(d2), str(d3))
-
-            if ax_case != '' and cor_case != '':
-                ax_cases_paths.append(ax_case)
-                cor_cases_paths.append(cor_case)
-
-    torch.save(ax_cases_paths, os.path.join(opt.main_root, 'axial_cases_paths.pt'))
-    torch.save(cor_cases_paths, os.path.join(opt.main_root, 'coronal_cases_paths.pt'))
-
-def extract_volume_from_dicom(case_path):
-    reader = sitk.ImageSeriesReader()
-    dicom_names = reader.GetGDCMSeriesFileNames(case_path)
-    reader.SetFileNames(dicom_names)
-    img = reader.Execute()
+def extract_volume_from_dicom(case_path, format, _min=0, _max=2048):
+    img = read_MRI_case(case_path, format)
     interp_img = resample_image(img)
 
-    img = convert_image_range(img, 0, 2048)
-    interp_img = convert_image_range(interp_img, 0, 2048)
+    img = convert_image_range(img, _min, _max, clamp_en=True)
+    interp_img = convert_image_range(interp_img, _min, _max, clamp_en=True)
 
     img_nda = sitk.GetArrayFromImage(img)
     interp_img_nda = sitk.GetArrayFromImage(interp_img)
@@ -113,7 +63,7 @@ def extract_volume_from_dicom(case_path):
     img_nda = minmax_scaler(img_nda, vmin=-1, vmax=1)
     interp_img_nda = minmax_scaler(interp_img_nda, vmin=-1, vmax=1)
 
-    return img, interp_img, torch.from_numpy(img_nda).to(torch.float32), torch.from_numpy(interp_img_nda).to(torch.float32)
+    return img, interp_img, img_nda, interp_img_nda
 
 def extract_patches_with_overlap(volume, patch_size=64, overlap_ratio=0.125):
     patches = []
@@ -243,35 +193,71 @@ def reconstruct_volume(opt, patches_3d_list, output_shape):
 
     return recon_vol
 
-def pad_volume(vol):
+def pad_volume(vol, dim):
     slices_num = vol.shape[0]
-    if slices_num > 512:
-        start = int((slices_num - 512)/2)
-        end = start + 512
-        return vol[start:end, :, :]
+    if slices_num > dim:
+        start = int((slices_num - dim)/2)
+        end = start + dim
+        res_vol = vol[start:end, :, :]
     else:
-        pad_vol = torch.zeros(512, 512, 512) - 1
-        start = int((512 - slices_num)/2)
+        pad_vol = torch.zeros(dim, dim, dim) - 1
+        start = int((dim - slices_num)/2)
         end = start + slices_num
         pad_vol[start:end, :, :] =  vol
-        return pad_vol
+        res_vol = pad_vol
+
+    res_vol = change_dim(res_vol, dim)
+    return res_vol
+
+def change_dim(image, target_dim):
+    if len(image.shape) == 2:
+        target_size = (target_dim, target_dim)
+    elif len(image.shape) == 3:
+        target_size = (image.shape[0], target_dim, target_dim)
+    else:
+        target_size = None
+        print(f'number of image dimensions is {len(image.shape)} != 2 or 3')
+
+    current_size = image.shape
+
+    # Initialize the output array with zeros
+    if 'torch' in str(image.dtype):
+        output_image = torch.zeros(target_size, dtype=image.dtype) - 1
+    else:
+        output_image = np.zeros(target_size, dtype=image.dtype) - 1
+
+    # Calculate the amount to pad or crop for each dimension
+    pad_crop = [((t - c) // 2, (t - c + 1) // 2) for t, c in zip(target_size, current_size)]
+
+    input_slices = tuple(slice(max(0, -p[0]), c - max(0, -p[1])) for p, c in zip(pad_crop, current_size))
+    output_slices = tuple(slice(max(0, p[0]), t - max(0, p[1])) for p, t in zip(pad_crop, target_size))
+
+    # Copy the data from the input to the output
+    output_image[output_slices] = image[input_slices]
+
+    return output_image
 
 def calc_dims(case, opt):
-    d_dim_no_round = get_dim_blocks(case.shape[0], dim_kernel_size=opt.patch_size,
-                                    dim_stride=int(opt.patch_size * (1 - opt.overlap_ratio)), round_down=False)
-    d_dim_upper = int(np.ceil(d_dim_no_round))
-    new_dim = opt.patch_size * d_dim_upper - int(opt.patch_size * opt.overlap_ratio) * (d_dim_upper - 1)
-    old_dim = case.shape[0]
-    return new_dim, old_dim
+    new_dim = np.zeros(3, dtype=int)
+    old_dim = np.zeros(3, dtype=int)
+    start_index = np.zeros(3, dtype=int)
+    for i in range(3):
+        d_dim_no_round = get_dim_blocks(case.shape[i], dim_kernel_size=opt.patch_size,
+                                        dim_stride=int(opt.patch_size * (1 - opt.overlap_ratio)), round_down=False)
+        d_dim_upper = int(np.ceil(d_dim_no_round))
+        new_dim[i] = opt.patch_size * d_dim_upper - int(opt.patch_size * opt.overlap_ratio) * (d_dim_upper - 1)
+        old_dim[i] = case.shape[i]
+        start_index[i] = int((new_dim[i] - old_dim[i]) / 2)
+    return new_dim, old_dim, start_index
 
-def simple_test_preprocess(case, opt):
-    _, _, _, interp_case = extract_volume_from_dicom(case)
+def simple_test_preprocess(case, opt, global_min, global_max):
+    _, _, _, interp_vol_nda = extract_volume_from_dicom(case, opt.data_format, _min=global_min, _max=global_max)
+    interp_vol_nda = change_dim(interp_vol_nda, target_dim=opt.vol_cube_dim)
+    interp_vol = torch.from_numpy(interp_vol_nda).to(torch.float32)
 
-    new_dim, old_dim = calc_dims(interp_case, opt)
-
-    start_idx = int((new_dim - old_dim) / 2)
-    padded_case = torch.zeros((1, 1, new_dim, 512, 512)) - 1
-    padded_case[:, :, start_idx:(start_idx + old_dim), :, :] = interp_case
+    new_dim, old_dim, s = calc_dims(interp_vol, opt)
+    padded_case = torch.zeros((1, 1, new_dim[0], new_dim[1], new_dim[2])) - 1
+    padded_case[:, :, s[0]:(s[0] + old_dim[0]), s[1]:(s[1] + old_dim[1]), s[2]:(s[2] + old_dim[2])] = interp_vol
 
     patches_3d = extract_patches_3d(padded_case, kernel_size=opt.patch_size, stride=int(opt.patch_size * (1 - opt.overlap_ratio)))
 
@@ -279,30 +265,32 @@ def simple_test_preprocess(case, opt):
 
 
 def simple_train_preprocess(opt):
-    cor_cases_paths = torch.load(os.path.join(opt.main_root, 'coronal_cases_paths.pt'))
+    df = pd.read_csv(os.path.join(opt.csv_name), low_memory=False)
+    cor_cases_paths = df.loc[:, 'coronal']
 
     cases_num = len(cor_cases_paths)
 
-    opt.data_dir = os.path.join(opt.main_root, opt.simple_root, 'data')
+    opt.data_dir = os.path.join(opt.main_root, opt.model_root, 'data')
     save_train_dir = os.path.join(opt.data_dir, 'train')
 
     mkdirs([opt.data_dir, save_train_dir])
+
+    global_min, global_max = find_grayscale_limits(cor_cases_paths, opt.data_format)
 
     save_idx = 0
 
     for case_idx in range(cases_num):
         cor_case = cor_cases_paths[case_idx]
+        print(f'case no: {case_idx} / {cases_num}, {cor_case=}')
 
-        _, _, _, interp_vol_nda = extract_volume_from_dicom(cor_case)
-        interp_vol_nda = interp_vol_nda.cpu().detach()
+        _, _, _, interp_vol_nda = extract_volume_from_dicom(cor_case, opt.data_format, _min=global_min, _max=global_max)
+        interp_vol_nda = change_dim(interp_vol_nda, target_dim=opt.vol_cube_dim)
+        interp_vol = torch.from_numpy(interp_vol_nda).to(torch.float32).cpu().detach()
+
         cor_atme_vol = torch.load(os.path.join(opt.main_root, opt.atme_cor_root, 'data', 'generation', f'case_{case_idx}', 'atme_vol.pt')).cpu().detach()
         ax_atme_vol = torch.load(os.path.join(opt.main_root, opt.atme_ax_root, 'data', 'generation', f'case_{case_idx}', 'atme_vol.pt')).cpu().detach()
 
-        if case_idx == 7 or case_idx == 70:
-            cor_atme_vol = torch.flip(cor_atme_vol, [0])
-            ax_atme_vol = torch.flip(ax_atme_vol, [0])
-
-        interp_patches = extract_patches_with_overlap(interp_vol_nda, opt.patch_size, opt.overlap_ratio)
+        interp_patches = extract_patches_with_overlap(interp_vol, opt.patch_size, opt.overlap_ratio)
         cor_atme_patches = extract_patches_with_overlap(cor_atme_vol, opt.patch_size, opt.overlap_ratio)
         ax_atme_patches = extract_patches_with_overlap(ax_atme_vol, opt.patch_size, opt.overlap_ratio)
 
@@ -314,25 +302,70 @@ def simple_train_preprocess(opt):
             cor_atme_patch = cor_atme_patches[i]['patch'].unsqueeze(0).clone()
             ax_atme_patch = ax_atme_patches[i]['patch'].unsqueeze(0).clone()
 
-            # print(f'{interp_patch.dtype=}, {interp_patch.element_size()=}, {interp_patch.nelement()=}')
-            # print(f'{cor_atme_patch.dtype=}, {cor_atme_patch.element_size()=}, {cor_atme_patch.nelement()=}')
-            # print(f'{ax_atme_patch.dtype=}, {ax_atme_patch.element_size()=}, {ax_atme_patch.nelement()=}')
-
             data = {'interp_patch': interp_patch, 'cor_atme_patch': cor_atme_patch, 'ax_atme_patch': ax_atme_patch}
 
             torch.save(data, os.path.join(save_train_dir, f'data_{save_idx}.pt'))
             save_idx += 1
 
+def read_MRI_case(case_path, format):
+    if format == 'dicom':
+        reader = sitk.ImageSeriesReader()
+        dicom_names = reader.GetGDCMSeriesFileNames(case_path)
+        reader.SetFileNames(dicom_names)
+        img = reader.Execute()
+    elif format == 'nifti':
+        reader = sitk.ImageFileReader()
+        reader.SetImageIO("NiftiImageIO")
+        reader.SetFileName(case_path)
+        img = reader.Execute()
+    else:
+        img = None
+        print(f'format {format} is not exist!')
+
+    img = permute_img_dims_order(img)
+
+    return img
+
+def permute_img_dims_order(img):
+    permute_filter = sitk.PermuteAxesImageFilter()
+    spacing = img.GetSpacing()
+    assert spacing[0] == spacing[1] or spacing[0] == spacing[2] or spacing[1] == spacing[2]
+    if spacing[0] == spacing[1]:
+        return img
+    elif spacing[0] == spacing[2]:
+        new_order = [0, 2, 1]
+        permute_filter.SetOrder(new_order)
+        return permute_filter.Execute(img)
+    else: # spacing[1] == spacing[2]
+        new_order = [1, 2, 0]
+        permute_filter.SetOrder(new_order)
+        return permute_filter.Execute(img)
+
+def find_grayscale_limits(cases, data_format='dicom'):
+    global_min = np.inf
+    global_max = 0
+
+    for i, case in enumerate(cases):
+        img = read_MRI_case(case, data_format)
+        img_nda = sitk.GetArrayFromImage(img)
+        _min = np.min(img_nda)
+        _max = np.max(img_nda)
+        if _min < global_min: global_min = _min
+        if _max > global_max: global_max = _max
+
+    return global_min, global_max
+
 def atme_train_preprocess(opt):
-    cases_paths = torch.load(os.path.join(opt.main_root, f'{opt.plane}_cases_paths.pt'))
+    df = pd.read_csv(os.path.join(opt.csv_name), low_memory=False)
+    cases_paths = df.loc[:, opt.plane]
 
     save_idx = 0
 
-    for i, case in enumerate(cases_paths):
-        print(f'case no: {i} in {len(cases_paths)}, {case=}')
-        org_vol, interp_vol, org_vol_nda, interp_vol_nda = extract_volume_from_dicom(case)
+    global_min, global_max = find_grayscale_limits(cases_paths, opt.data_format)
 
-        if org_vol.GetSize()[1] != 512: continue
+    for i, case in enumerate(cases_paths):
+        print(f'case no: {i} / {len(cases_paths)}, {case=}')
+        org_vol, interp_vol, org_vol_nda, interp_vol_nda = extract_volume_from_dicom(case, opt.data_format, _min=global_min, _max=global_max)
 
         org_slices_num = org_vol.GetSize()[2]
         interp_slices_num = interp_vol.GetSize()[2]
@@ -363,16 +396,24 @@ def atme_train_preprocess(opt):
 
             interp_img = b * interp_vol_nda[int(indices[0]), :, :] + a * interp_vol_nda[int(indices[1]), :, :]
 
-            if opt.plane == 'axial':
+            org_img = change_dim(org_img, target_dim=opt.vol_cube_dim)
+            interp_img = change_dim(interp_img, target_dim=opt.vol_cube_dim)
+
+            if opt.plane in ['axial', 'sagittal']:
                 strided_interp_img = np.zeros_like(interp_img)
-                for i in range(0, 512, opt.stride):
-                    strided_interp_img[i:i + opt.stride, :] = interp_img[i, :]
+                if opt.plane == 'axial':
+                    interp_img = np.transpose(interp_img)
+                    strided_interp_img = np.transpose(strided_interp_img)
+                for k in range(0, opt.vol_cube_dim, opt.stride):
+                    strided_interp_img[k:k + opt.stride, :] = interp_img[k, :]
+                if opt.plane == 'axial':
+                    strided_interp_img = np.transpose(strided_interp_img)
                 interp_img = strided_interp_img
 
             org_img = np.expand_dims(org_img, axis=0)
             interp_img = np.expand_dims(interp_img, axis=0)
 
-            torch.save(torch.from_numpy(org_img), os.path.join(opt.data_dir, 'original', f'img_{save_idx}.pt'))
-            torch.save(torch.from_numpy(interp_img), os.path.join(opt.data_dir, 'interpolation', f'img_{save_idx}.pt'))
+            torch.save(torch.from_numpy(org_img).to(torch.float32), os.path.join(opt.data_dir, 'original', f'img_{save_idx}.pt'))
+            torch.save(torch.from_numpy(interp_img).to(torch.float32), os.path.join(opt.data_dir, 'interpolation', f'img_{save_idx}.pt'))
 
             save_idx += 1

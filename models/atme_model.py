@@ -85,7 +85,7 @@ class AtmeModel(BaseModel):
                                          'random_fourier_features': opt.random_fourier_features,
                                          'time_dim_mult': opt.time_dim_mult})
 
-        self.netW = networks.define_W(opt.init_type, opt.init_gain, self.gpu_ids)
+        self.netW = networks.define_W(opt.init_type, opt.init_gain, self.gpu_ids, output_size=opt.vol_cube_dim)
         self.disc_pool = DiscPool(opt, self.device, dataset, isTrain=self.isTrain)
 
         if self.isTrain:

@@ -21,10 +21,13 @@ class BaseOptions():
         """Define the common options that are used in both training and test."""
         # basic parameters
         parser.add_argument('--main_root', type=str, default='outputs', help='path to save script outputs')
-        parser.add_argument('--dataroot', required=True, default='/tcmldrive/databases/Private/RambamMRE082022Sorter/', help='path to images')
+        parser.add_argument('--csv_name', required=True, default='coronal_axial_sagital_cases.csv', help='csv_file_name')
+        parser.add_argument('--data_format', required=True, default='nifti', help='data format [dicom, nifti]')
+        parser.add_argument('--vol_cube_dim', required=True, type=int, default=512, help='the dimension size of the resulted volume (which has cube shape)')
+        parser.add_argument('--isTrain', required=True, default=True, action=argparse.BooleanOptionalAction, help='if specified, train the model')
         parser.add_argument('--save_dir', default='outputs', help='path to save script outputs (should have subfolders trainA, trainB, valA, valB, etc)')
-        parser.add_argument('--calculate_dataset', default=False, action=argparse.BooleanOptionalAction, help='if specified, calculate and pre-preprocess dataset')
-        parser.add_argument('--exp_name', type=str, default='trial', help='name of the experiment. It decides where to store samples and models')
+        parser.add_argument('--calculate_dataset', default=True, action=argparse.BooleanOptionalAction, help='if specified, calculate and pre-preprocess dataset')
+        parser.add_argument('--exp_name', type=str, default='runs', help='name of the experiment. It decides where to store samples and models')
         parser.add_argument('--data_name', type=str, default='data', help='name of the data directory. It decides where to store samples and models')
         parser.add_argument('--preprocess', type=str, default='none', help='scaling and cropping of images at load time [resize_and_crop | crop | scale_width | scale_width_and_crop | none]')
         parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
@@ -42,25 +45,19 @@ class BaseOptions():
         These options are defined in the <modify_commandline_options> function
         in model and dataset classes.
         """
-        print('here-0')
         if not self.initialized:  # check if it has been initialized
             if parser is None:
                 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
             parser = self.initialize(parser)
-        print('here-1')
+
         # get the basic options
         opt, _ = parser.parse_known_args()
-        print(f'{opt=}')
+
         # modify model-related parser options
         model_name = opt.model
         model_option_setter = models.get_option_setter(model_name)
-        parser = model_option_setter(parser, self.isTrain)
+        parser = model_option_setter(parser, opt.isTrain)
         opt, _ = parser.parse_known_args()  # parse again with new defaults
-
-        # modify dataset-related parser options
-        # dataset_name = opt.dataset_mode
-        # dataset_option_setter = data.get_option_setter(dataset_name)
-        # parser = dataset_option_setter(parser, self.isTrain)
 
         # save and return the parser
         self.parser = parser
@@ -76,15 +73,12 @@ class BaseOptions():
         message += '----------------- Options ---------------\n'
         for k, v in sorted(vars(opt).items()):
             comment = ''
-            # default = self.parser.get_default(k)
-            # if v != default:
-            #     comment = '\t[default: %s]' % str(default)
             message += '{:>25}: {:<30}{}\n'.format(str(k), str(v), comment)
         message += '----------------- End -------------------'
         print(message)
 
         # save to the disk
-        expr_dir = os.path.join(opt.main_root, opt.atme_root, opt.exp_name, opt.checkpoints_dir)
+        expr_dir = os.path.join(opt.main_root, opt.model_root, opt.exp_name, opt.checkpoints_dir)
         util.mkdirs(expr_dir)
         file_name = os.path.join(expr_dir, '{}_opt.txt'.format(opt.phase))
         with open(file_name, 'wt') as opt_file:
@@ -95,7 +89,7 @@ class BaseOptions():
         """Parse our options, create checkpoints directory suffix, and set up gpu device."""
         opt = self.gather_options(parser)
 
-        opt.isTrain = self.isTrain  # train or test
+        # opt.isTrain = self.isTrain  # train or test
 
         # process opt.suffix
         if opt.suffix:

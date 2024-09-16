@@ -366,19 +366,29 @@ class Unet(nn.Module):
 
 
 class WBlock(nn.Module):
-    def __init__(self):
+    def __init__(self, output_size=512):
         super(WBlock, self).__init__()
 
-        sequence = [nn.Upsample((64, 64), mode='bilinear', align_corners=False),
-                    Block(1, 32),
-                    nn.Upsample((128, 128), mode='bilinear', align_corners=False),
-                    Block(32, 64),
-                    nn.Upsample((256, 256), mode='bilinear', align_corners=False),
-                    Block(64, 64),
-                    nn.Upsample((512, 512), mode='bilinear', align_corners=False),
-                    Block(64, 32),
-                    nn.Conv2d(32, 1, 1),
-                    nn.Tanh()]
+        if output_size == 256:
+            sequence = [nn.Upsample((64, 64), mode='bilinear', align_corners=False),
+                        Block(1, 32),
+                        nn.Upsample((128, 128), mode='bilinear', align_corners=False),
+                        Block(32, 64),
+                        nn.Upsample((256, 256), mode='bilinear', align_corners=False),
+                        Block(64, 32),
+                        nn.Conv2d(32, 1, 1),
+                        nn.Tanh()]
+        elif output_size == 512:
+            sequence = [nn.Upsample((64, 64), mode='bilinear', align_corners=False),
+                        Block(1, 32),
+                        nn.Upsample((128, 128), mode='bilinear', align_corners=False),
+                        Block(32, 64),
+                        nn.Upsample((256, 256), mode='bilinear', align_corners=False),
+                        Block(64, 64),
+                        nn.Upsample((512, 512), mode='bilinear', align_corners=False),
+                        Block(64, 32),
+                        nn.Conv2d(32, 1, 1),
+                        nn.Tanh()]
 
         self.model = nn.Sequential(*sequence)
 

@@ -23,7 +23,9 @@ import random
 import time
 import torch
 import numpy as np
+import pandas as pd
 from data import create_atme_train_dataset, create_atme_test_dataset
+from data.preprocess import find_grayscale_limits
 from models import create_model
 from util.visualizer import Visualizer, save_atme_images
 from options.atme_options import AtmeOptions
@@ -100,33 +102,40 @@ def train(opt):
         # Save D_real and D_fake
         visualizer.save_D_losses(model.get_current_losses())
 
+        losses = model.get_current_losses()
+        visualizer.save_to_tensorboard_writer(epoch, losses)
+
         print('End of epoch %d / %d \t Time Taken: %d sec' % (epoch, opt.n_epochs + opt.n_epochs_decay, time.time() - epoch_start_time))
 
 def test(opt):
     opt.isTrain = False
 
-    opt.save_dir = os.path.join(opt.main_root, opt.atme_root, opt.exp_name)
-    opt.data_dir = os.path.join(opt.main_root, opt.atme_root, opt.data_name)
+    opt.save_dir = os.path.join(opt.main_root, opt.model_root, opt.exp_name)
+    opt.data_dir = os.path.join(opt.main_root, opt.model_root, opt.data_name)
 
     save_fig_dir = os.path.join(opt.save_dir, 'figures', 'test')
     mkdir(save_fig_dir)
 
-    cases_paths = torch.load(os.path.join(opt.main_root, f'coronal_cases_paths.pt'))
+    df = pd.read_csv(os.path.join(opt.csv_name), low_memory=False)
+    cor_cases_paths = df.loc[:, 'coronal']
 
-    plot_slice = 100 if opt.plane == 'coronal' else 250
+    plot_slice = 150
 
-    for i, cor_case in enumerate(cases_paths):
+    global_min, global_max = find_grayscale_limits(cor_cases_paths, opt.data_format)
+
+    for i, cor_case in enumerate(cor_cases_paths):
+        print(f'case no: {i} / {len(cor_cases_paths)}, {cor_case=}')
 
         save_dir = os.path.join(opt.data_dir, 'generation', f'case_{i}')
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
-        dataset = create_atme_test_dataset(opt, cor_case, i)
+        dataset = create_atme_test_dataset(opt, cor_case, i, global_min, global_max)
         model = create_model(opt, dataset)
         model.setup(opt)
         model.eval()
 
-        gen_vol = torch.zeros((len(dataset), 512, 512))
+        gen_vol = torch.zeros((len(dataset), opt.vol_cube_dim, opt.vol_cube_dim))
 
         for j, data in enumerate(dataset):
             model.set_input(data)

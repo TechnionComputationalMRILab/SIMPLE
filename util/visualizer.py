@@ -84,27 +84,27 @@ def plot_simple_train_results(model, epoch, figures_path):
 def plot_simple_test_results(interp_vol, simple_vol, figures_path, case_idx):
     fig, axs = plt.subplots(2, 2)
 
-    interp_cor_slice = interp_vol[250, :, :].cpu().detach().numpy()
+    interp_cor_slice = interp_vol[150, :, :].cpu().detach().numpy()
     axs[0, 0].imshow(interp_cor_slice, vmin=-1, vmax=1, cmap="gray")
     axs[0, 0].set_xticks([])
     axs[0, 0].set_yticks([])
     axs[0, 0].set_title(f'Interpolation')
     axs[0, 0].set_ylabel('Coronal', fontsize="10")
 
-    simple_cor_slice = simple_vol[250, :, :].cpu().detach().numpy()
+    simple_cor_slice = simple_vol[150, :, :].cpu().detach().numpy()
     axs[0, 1].imshow(simple_cor_slice, vmin=-1, vmax=1, cmap="gray")
     axs[0, 1].set_xticks([])
     axs[0, 1].set_yticks([])
     axs[0, 1].set_title(f'SIMPLE')
 
-    interp_ax_slice = torch.movedim(interp_vol, (0, 1, 2), (1, 0, 2))[250, :, :].cpu().detach().numpy()
+    interp_ax_slice = torch.movedim(interp_vol, (0, 1, 2), (1, 0, 2))[150, :, :].cpu().detach().numpy()
     axs[1, 0].imshow(interp_ax_slice, vmin=-1, vmax=1, cmap="gray")
     axs[1, 0].set_xticks([])
     axs[1, 0].set_yticks([])
     axs[1, 0].set_title(f'Interpolation')
     axs[1, 0].set_ylabel('Axial', fontsize="10")
 
-    simple_ax_slice = torch.movedim(simple_vol, (0, 1, 2), (1, 0, 2))[250, :, :].cpu().detach().numpy()
+    simple_ax_slice = torch.movedim(simple_vol, (0, 1, 2), (1, 0, 2))[150, :, :].cpu().detach().numpy()
     axs[1, 1].imshow(simple_ax_slice, vmin=-1, vmax=1, cmap="gray")
     axs[1, 1].set_xticks([])
     axs[1, 1].set_yticks([])
@@ -148,11 +148,12 @@ class Visualizer():
         #     if not self.vis.check_connection():
         #         self.create_visdom_connections()
 
-        if self.use_html:  # create an HTML object at <checkpoints_dir>/web/; images will be saved under <checkpoints_dir>/web/images/
-            self.web_dir = os.path.join(opt.save_dir, opt.checkpoints_dir, 'web')
-            self.img_dir = os.path.join(self.web_dir, 'images')
-            print('create web directory %s...' % self.web_dir)
-            util.mkdirs([self.web_dir, self.img_dir])
+        # if self.use_html:  # create an HTML object at <checkpoints_dir>/web/; images will be saved under <checkpoints_dir>/web/images/
+        #     self.web_dir = os.path.join(opt.save_dir, opt.checkpoints_dir, 'web')
+        #     self.img_dir = os.path.join(self.web_dir, 'images')
+        #     print('create web directory %s...' % self.web_dir)
+        #     util.mkdirs([self.web_dir, self.img_dir])
+
         # create a logging file to store training losses
         self.log_name = os.path.join(opt.save_dir, opt.checkpoints_dir, 'loss_log.txt')
         self.log_name_csv = os.path.join(opt.save_dir, opt.checkpoints_dir, 'loss_log.csv')
@@ -189,19 +190,19 @@ class Visualizer():
                 util.save_image(image_numpy, img_path)
 
             # update website
-            webpage = html.HTML(self.web_dir, 'Experiment name = %s' % self.name, refresh=1)
-            for n in range(epoch, 0, -1):
-                webpage.add_header('epoch [%d]' % n)
-                ims, txts, links = [], [], []
-
-                for label, image_numpy in visuals.items():
-                    image_numpy = util.tensor2im(image)
-                    img_path = 'epoch%.3d_%s.png' % (n, label)
-                    ims.append(img_path)
-                    txts.append(label)
-                    links.append(img_path)
-                webpage.add_images(ims, txts, links, width=self.win_size)
-            webpage.save()
+            # webpage = html.HTML(self.web_dir, 'Experiment name = %s' % self.name, refresh=1)
+            # for n in range(epoch, 0, -1):
+            #     webpage.add_header('epoch [%d]' % n)
+            #     ims, txts, links = [], [], []
+            #
+            #     for label, image_numpy in visuals.items():
+            #         image_numpy = util.tensor2im(image)
+            #         img_path = 'epoch%.3d_%s.png' % (n, label)
+            #         ims.append(img_path)
+            #         txts.append(label)
+            #         links.append(img_path)
+            #     webpage.add_images(ims, txts, links, width=self.win_size)
+            # webpage.save()
 
     def plot_current_losses(self, epoch, counter_ratio, losses):
         """display the current losses on visdom display: dictionary of error labels and values

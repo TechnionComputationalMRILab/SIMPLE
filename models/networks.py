@@ -225,8 +225,8 @@ def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal'
         raise NotImplementedError('Discriminator model name [%s] is not recognized' % netD)
     return init_net(net, init_type, init_gain, gpu_ids)
 
-def define_W(init_type='normal', init_gain=0.02, gpu_ids=[]):
-    return init_net(WBlock(), init_type, init_gain, gpu_ids)
+def define_W(init_type='normal', init_gain=0.02, gpu_ids=[], output_size=512):
+    return init_net(WBlock(output_size), init_type, init_gain, gpu_ids)
 
 ##############################################################################
 # Classes

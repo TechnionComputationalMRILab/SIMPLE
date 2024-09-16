@@ -10,9 +10,11 @@ class SimpleOptions(BaseOptions):
     def initialize(self, parser):
         parser = BaseOptions.initialize(self, parser)
         # visdom and HTML visualization parameters
-        parser.add_argument('--simple_root', default='simple_output', help='path to images (should have subfolders trainA, trainB, valA, valB, etc)')
-        parser.add_argument('--atme_cor_root', default='atme_coronal_output', help='path to atme coronal images (should have subfolders trainA, trainB, valA, valB, etc)')
-        parser.add_argument('--atme_ax_root', default='atme_axial_output', help='path to atme axial images (should have subfolders trainA, trainB, valA, valB, etc)')
+        parser.add_argument('--model_root', default='simple_output', help='path to images (should have subfolders trainA, trainB, valA, valB, etc)')
+        parser.add_argument('--planes_number', required=True, default=2, help='number of planes to train simple')
+        parser.add_argument('--atme_cor_root', default='atme_coronal_output', help='main path to atme coronal model')
+        parser.add_argument('--atme_ax_root', default='atme_axial_output', help='main path to atme axial model')
+        parser.add_argument('--atme_sag_root', default='atme_sagittal_output', help='main path to atme sagittal model')
         parser.add_argument('--display_freq', type=int, default=400, help='frequency of showing training results on screen')
         parser.add_argument('--display_ncols', type=int, default=4, help='if positive, display all images in a single visdom web panel with certain number of images per row.')
         parser.add_argument('--display_id', type=int, default=1, help='window id of the web display')

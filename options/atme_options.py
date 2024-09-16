@@ -12,7 +12,7 @@ class AtmeOptions(BaseOptions):
         parser = BaseOptions.initialize(self, parser)
         # visdom and HTML visualization parameters
         parser.add_argument('--plane', type=str, required=True, default='coronal', help='define the plane the atme is trained on')
-        parser.add_argument('--atme_root', type=str, default='atme_coronal_output', help='path to atme coronal images (should have subfolders trainA, trainB, valA, valB, etc)')
+        parser.add_argument('--model_root', type=str, default='atme_coronal_output', help='path to atme coronal images (should have subfolders trainA, trainB, valA, valB, etc)')
         parser.add_argument('--TestAfterTrain', default=True, action=argparse.BooleanOptionalAction, help='specify if to test immediatly after train')
         parser.add_argument('--display_freq', type=int, default=400, help='frequency of showing training results on screen')
         parser.add_argument('--display_ncols', type=int, default=4, help='if positive, display all images in a single visdom web panel with certain number of images per row.')
@@ -61,6 +61,6 @@ class AtmeOptions(BaseOptions):
         parser.add_argument('--lr_policy', type=str, default='linear', help='learning rate policy. [linear | step | plateau | cosine]')
         parser.add_argument('--lr_decay_iters', type=int, default=50, help='multiply by a gamma every lr_decay_iters iterations')
 
-        self.isTrain = True
+        # self.isTrain = True
 
         return parser

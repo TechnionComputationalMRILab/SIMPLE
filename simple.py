@@ -3,8 +3,9 @@ import time
 import torch
 import random
 import numpy as np
+import pandas as pd
 from data import create_simple_train_dataset, create_simple_test_dataset
-from data.preprocess import reconstruct_volume, pad_volume
+from data.preprocess import reconstruct_volume, pad_volume, find_grayscale_limits
 from models import create_model
 from util.visualizer import Visualizer, plot_simple_train_results, plot_simple_test_results
 from util.util import mkdir, mkdirs
@@ -19,7 +20,7 @@ np.random.seed(13)
 def train(opt):
     opt.isTrain = True
 
-    opt.save_dir = os.path.join(opt.main_root, opt.simple_root, opt.exp_name)
+    opt.save_dir = os.path.join(opt.main_root, opt.model_root, opt.exp_name)
     mkdir(opt.save_dir)
 
     model = create_model(opt)
@@ -28,9 +29,6 @@ def train(opt):
 
     train_loader = create_simple_train_dataset(opt)
     print('prepare data_loader done')
-
-    dataset_size = len(train_loader)
-    print('The number of training images = %d' % dataset_size)
 
     total_iters = 0
 
@@ -62,8 +60,6 @@ def train(opt):
                 losses = model.get_current_losses()
                 t_comp = (time.time() - iter_start_time) / opt.batch_size
                 visualizer.print_current_losses(epoch, epoch_iter, losses, t_comp, t_data)
-                # if opt.display_id > 0:
-                #     visualizer.plot_current_losses(epoch, float(epoch_iter) / dataset_size, losses)
 
             iter_data_time = time.time()
         if epoch % opt.save_epoch_freq == 0:
@@ -79,8 +75,8 @@ def train(opt):
 def test(opt):
     opt.isTrain = False
 
-    opt.save_dir = os.path.join(opt.main_root, opt.simple_root, opt.exp_name)
-    opt.data_dir = os.path.join(opt.main_root, opt.simple_root, opt.data_name)
+    opt.save_dir = os.path.join(opt.main_root, opt.model_root, opt.exp_name)
+    opt.data_dir = os.path.join(opt.main_root, opt.model_root, opt.data_name)
     figures_path = os.path.join(opt.save_dir, 'figures', 'test')
     mkdir(figures_path)
 
@@ -89,12 +85,15 @@ def test(opt):
 
     # visualizer = Visualizer(opt) #TODO: to add a plot of simple results
 
+    df = pd.read_csv(os.path.join(opt.csv_name), low_memory=False)
+    cor_cases_paths = df.loc[:, 'coronal']
 
-    cor_cases_paths = torch.load(os.path.join(opt.main_root, f'coronal_cases_paths.pt'))
+    global_min, global_max = find_grayscale_limits(cor_cases_paths, opt.data_format)
 
     for case_idx, cor_case in enumerate(cor_cases_paths):
-        print(f'{case_idx=}')
-        data_loader = create_simple_test_dataset(cor_case, opt)
+        print(f'case no: {case_idx} / {len(cor_cases_paths)}, {cor_case=}')
+
+        data_loader = create_simple_test_dataset(cor_case, opt, global_min, global_max)
 
         output_patches_3d = []
         for l, data in enumerate(data_loader):
@@ -107,9 +106,9 @@ def test(opt):
         interp_vol = DS.padded_case
         recon_vol = reconstruct_volume(opt, output_patches_3d, interp_vol.shape)
 
-        interp_vol = pad_volume(interp_vol.squeeze())
-        recon_vol = pad_volume(recon_vol.squeeze())
-
+        interp_vol = pad_volume(interp_vol.squeeze(), opt.vol_cube_dim)
+        recon_vol = pad_volume(recon_vol.squeeze(), opt.vol_cube_dim)
+        
         plot_simple_test_results(interp_vol, recon_vol, figures_path, case_idx)
 
         save_dir = os.path.join(opt.data_dir, 'test', f'case_{case_idx}')
