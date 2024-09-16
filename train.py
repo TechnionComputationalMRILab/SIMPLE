@@ -32,4 +32,4 @@ if __name__ == '__main__':
         SimpleOptions().print_options(simple_opt)
         simple.train(simple_opt)
     else:
-        print(f'model {opt.model} is not exist!')
+        print(f'model {opt.model} does not exist!')

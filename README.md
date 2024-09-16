@@ -12,21 +12,23 @@ To use this project, use the following steps:
 1. **Clone the Repository:**
    ```sh
    git clone https://github.com/TechnionComputationalMRILab/SIMPLE.git
-2. **Install Dependecie (via conda)**
+2. **Install Dependencies (via conda)**
    ```sh
-   conda env create -f environment.yml
+   pip install torch==2.3.1+cu118 torchvision --index-url https://download.pytorch.org/whl/cu118
 
+   conda env create -f environment.yml
+   
 ## Pre-Processing
-organize_data() is an internal method in data/preprocess.py for extracting matching pairs of coronal and axial FIESTA DICOM cases. This method should be writen according to the organizion of your raw data. The method should return 2 files: 'coronal_cases_paths.pt' and 'axial_cases_paths.pt' - each one of them contains a list of matching coronal or axial cases respectively.
+organize_data() is an internal method in data/preprocess.py for extracting matching pairs of coronal and axial FIESTA DICOM cases. This method should be written according to the organization of your raw data. The method should return 2 files: 'coronal_cases_paths.pt' and 'axial_cases_paths.pt' - each one of them contains a list of matching coronal or axial cases respectively.
 In case your raw data is not saved in DICOM format, please adapt also the method extract_volume_from_dicom().
 
 ## Training
 This project contains 2 models: ATME and SIMPLE.
 
-ATME is used as a preliminery stage for creating HR MRI images. 
-In order to train SIMPLE, you should train first 2 ATME models for the coronal and axial planes sepearetly and then evaluating each of them on the whole dataset.
+ATME is used as a preliminary stage for creating HR MRI images. 
+In order to train SIMPLE, you should train first 2 ATME models for the coronal and axial planes separately and then evaluating each of them on the whole dataset.
 
-- For training ATME, run the following command and specify the flags: --plane (coronal/axial) and --dataroot (the path for dicom files) . For evaluating ATME on the whole dataset immediatly after the training, use the flag --TestAfterTrain, else run the test command for ATME.
+- For training ATME, run the following command and specify the flags: --plane (coronal/axial) and --dataroot (the path for dicom files) . For evaluating ATME on the whole dataset immediately after the training, use the flag --TestAfterTrain, else run the test command for ATME.
 
    ```sh
    python train.py atme --plane=coronal --dataroot=<data_path>
