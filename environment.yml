@@ -68,4 +68,3 @@ dependencies:
       - triton==2.3.1
       - typing-extensions==4.9.0
       - werkzeug==3.0.4
-prefix: /home/ang.a/.conda/envs/simple_test
