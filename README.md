@@ -20,10 +20,11 @@ To use this project, use the following steps:
    
 ## Pre-Processing
 You should provide a csv file that contains a table with 2 or 3 columns.
-Each column represents the path for the MRI case (in dicom of nifti format) of specific plane. The column name can be 'coronal'/'axial'/'sagittal'.
+Each column represents the path for MRI case (DICOM/Nifti format) in specific plane. The column name can be 'coronal'/'axial'/'sagittal'.
 Each row represents the cases for specific patient.
+
 For eaxample:
-![image](figures/model_arch_with_loss.png)
+![image](figures/csv_file_example.png)
 ## Training
 This project contains 2 models: ATME and SIMPLE.
 
