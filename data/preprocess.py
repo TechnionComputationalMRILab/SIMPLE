@@ -194,6 +194,8 @@ def reconstruct_volume(opt, patches_3d_list, output_shape):
     return recon_vol
 
 def pad_volume(vol, dim):
+    vol = change_dim(vol, dim)
+    
     slices_num = vol.shape[0]
     if slices_num > dim:
         start = int((slices_num - dim)/2)
@@ -206,7 +208,6 @@ def pad_volume(vol, dim):
         pad_vol[start:end, :, :] =  vol
         res_vol = pad_vol
 
-    res_vol = change_dim(res_vol, dim)
     return res_vol
 
 def change_dim(image, target_dim):
