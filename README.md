@@ -42,7 +42,11 @@ For both models you must specify the following base flags:
 
 --data_format (dicom/nifti)
 
---vol_cube_dim (the dimension of the resulted cube MRI volume - can be any value above 256). *Pay attention that different cube dimension may require different number of discriminator layers (for example: 256 require 3 discriminator layers, 512 require 4 discriminator layers)
+--global_min / --global_max (specify the grayscale range of the images, else the code calculate the absolute minimum and maximum values)
+
+--phase (train/test)
+
+--vol_cube_dim (the dimension of the resulted cube MRI volume - can be any value above 256). *Pay attention that different cube dimension may require different number of discriminator layers for ATME training (for example: 256 require 3 discriminator layers, 512 require 4 discriminator layers)
 
 --calculate_dataset or --no-calculate_dataset (whether to perform pre-processing for the dataset or not. Data pre-proceesing must be done before the training).
 
@@ -80,6 +84,12 @@ For both models you must specify the following base flags:
    ```sh
    python test.py simple --planes_number=2 --model_root=simple_output --csv_name=<file_name>.csv --vol_cube_dim=256
    ```
+
+## Pre-Trained Model
+For evaluating the model (ATME/SIMPLE) using pre-trained model, please add the flag --pre_train_G_path to specify the pre-trained generator path.
+
+For evaluating ATME using pre-trained model, please add also the flag --pre_train_W_path to specify the pre-trained W network path.
+
 ## Contact
 
 Please contact us on be.rotem@campus.technion.ac.il
