@@ -24,7 +24,7 @@ Each column represents the path for MRI case (DICOM/Nifti format) in specific pl
 Each row represents the cases for specific patient.
 The csv file should be located under SIMPLE directory.
 
-For eaxample:
+For example:
 ![image](figures/csv_file_example.png)
 ## Training
 This project contains 2 models: ATME and SIMPLE.
