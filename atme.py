@@ -39,8 +39,8 @@ np.random.seed(13)
 def train(opt):
     opt.isTrain = True
 
-    opt.save_dir = os.path.join(opt.main_root, opt.atme_root, opt.exp_name)
-    opt.data_dir = os.path.join(opt.main_root, opt.atme_root, opt.data_name)
+    opt.save_dir = os.path.join(opt.main_root, opt.model_root, opt.exp_name)
+    opt.data_dir = os.path.join(opt.main_root, opt.model_root, opt.data_name)
     save_fig_dir = os.path.join(opt.save_dir, 'figures', 'train')
     mkdirs([opt.save_dir, opt.data_dir, save_fig_dir])
 

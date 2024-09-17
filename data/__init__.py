@@ -15,7 +15,7 @@ def create_simple_train_dataset(opt):
 
     if not os.path.exists(os.path.join(opt.data_dir, 'train')):
         os.makedirs(os.path.join(opt.data_dir, 'train'))
-    print(f'{opt.data_dir=}')
+
     empty_data_dir = True if len(os.listdir(os.path.join(opt.data_dir, 'train'))) == 0 else False
 
     if opt.calculate_dataset or empty_data_dir:

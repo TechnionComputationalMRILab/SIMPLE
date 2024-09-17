@@ -24,7 +24,7 @@ class BaseOptions():
         parser.add_argument('--csv_name', required=True, default='coronal_axial_sagital_cases.csv', help='csv_file_name')
         parser.add_argument('--data_format', required=True, default='nifti', help='data format [dicom, nifti]')
         parser.add_argument('--vol_cube_dim', required=True, type=int, default=512, help='the dimension size of the resulted volume (which has cube shape)')
-        parser.add_argument('--isTrain', required=True, default=True, action=argparse.BooleanOptionalAction, help='if specified, train the model')
+        parser.add_argument('--isTrain', default=True, action=argparse.BooleanOptionalAction, help='if specified, train the model')
         parser.add_argument('--save_dir', default='outputs', help='path to save script outputs (should have subfolders trainA, trainB, valA, valB, etc)')
         parser.add_argument('--calculate_dataset', default=True, action=argparse.BooleanOptionalAction, help='if specified, calculate and pre-preprocess dataset')
         parser.add_argument('--exp_name', type=str, default='runs', help='name of the experiment. It decides where to store samples and models')
