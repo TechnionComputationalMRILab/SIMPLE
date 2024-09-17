@@ -27,8 +27,8 @@ def create_simple_train_dataset(opt):
     data_loader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=True, num_workers=4, persistent_workers=True)
     return data_loader
 
-def create_simple_test_dataset(case, opt, global_min, global_max):
-    dataset = SimpleTestDataset(case, opt, global_min, global_max)
+def create_simple_test_dataset(case, opt):
+    dataset = SimpleTestDataset(case, opt)
     data_loader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=False, num_workers=4, persistent_workers=True)
     return data_loader
 
@@ -52,8 +52,8 @@ def create_atme_train_dataset(opt):
     data_loader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=True, num_workers=4, persistent_workers=True)
     return data_loader
 
-def create_atme_test_dataset(opt, case, case_index, global_min, global_max):
-    dataset = AtmeTestDataset(opt.plane, case, case_index, opt.vol_cube_dim, opt.data_format, global_min, global_max)
+def create_atme_test_dataset(opt, case, case_index):
+    dataset = AtmeTestDataset(opt, case, case_index)
     data_loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4, persistent_workers=True)
     return data_loader
 
@@ -82,8 +82,8 @@ class SimpleTrainDataset(Dataset):
         return ret_dict
 
 class SimpleTestDataset(Dataset):
-    def __init__(self, case, opt, global_min, global_max, transform=None, target_transform=None):
-        self.patches_3d, self.padded_case = simple_test_preprocess(case, opt, global_min, global_max)
+    def __init__(self, case, opt, transform=None, target_transform=None):
+        self.patches_3d, self.padded_case = simple_test_preprocess(case, opt)
         self.transform = transform
         self.target_transform = target_transform
 
@@ -126,14 +126,14 @@ class AtmeTrainDataset(Dataset):
         return ret_dict
 
 class AtmeTestDataset(Dataset):
-    def __init__(self, plane, case, case_index, vol_cube_dim=512, data_format='dicom', global_min=0, global_max=2048, transform=None, target_transform=None):
-        _, _, _, case_interp_vol = extract_volume_from_dicom(case, data_format, _min=global_min, _max=global_max)
+    def __init__(self, opt, case, case_index, transform=None, target_transform=None):
+        _, _, _, case_interp_vol = extract_volume_from_dicom(case, opt.data_format, _min=opt.global_min, _max=opt.global_max)
         self.case_interp_vol = torch.from_numpy(case_interp_vol).to(torch.float32)
-        self.plane = plane
+        self.plane = opt.plane
         self.start_idx = None
         self.end_idx = None
         self.case_index = case_index
-        self.dim = vol_cube_dim
+        self.dim = opt.vol_cube_dim
         if self.plane == 'axial': self.case_interp_vol = self.pad_vol()
         self.transform = transform
         self.target_transform = target_transform
@@ -154,7 +154,7 @@ class AtmeTestDataset(Dataset):
         return ret_dict
 
     def pad_vol(self):
-        padding_case = np.zeros((self.dim, self.dim, self.dim)) - 1
+        padding_case = torch.zeros((self.dim, self.dim, self.dim)) - 1
         if self.case_interp_vol.shape[0] <= self.dim:
             self.start_idx = int(np.ceil((self.dim - self.case_interp_vol.shape[0]) / 2))
             self.end_idx = self.start_idx + self.case_interp_vol.shape[0]

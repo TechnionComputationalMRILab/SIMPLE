@@ -25,7 +25,7 @@ import torch
 import numpy as np
 import pandas as pd
 from data import create_atme_train_dataset, create_atme_test_dataset
-from data.preprocess import find_grayscale_limits
+from data.preprocess import find_grayscale_limits, save_nifti
 from models import create_model
 from util.visualizer import Visualizer, save_atme_images
 from options.atme_options import AtmeOptions
@@ -121,7 +121,8 @@ def test(opt):
 
     plot_slice = 150
 
-    global_min, global_max = find_grayscale_limits(cor_cases_paths, opt.data_format)
+    if opt.global_min == 0 and opt.global_max == 0:
+        opt.global_min, opt.global_max = find_grayscale_limits(cor_cases_paths, opt.data_format)
 
     for i, cor_case in enumerate(cor_cases_paths):
         print(f'case no: {i} / {len(cor_cases_paths)}, {cor_case=}')
@@ -130,7 +131,7 @@ def test(opt):
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
-        dataset = create_atme_test_dataset(opt, cor_case, i, global_min, global_max)
+        dataset = create_atme_test_dataset(opt, cor_case, i)
         model = create_model(opt, dataset)
         model.setup(opt)
         model.eval()
@@ -150,6 +151,10 @@ def test(opt):
             gen_vol = dataset.dataset.crop_volume(gen_vol)
 
         torch.save(gen_vol, os.path.join(save_dir, 'atme_vol.pt'))
+
+        if opt.save_nifti:
+            save_nifti(gen_vol, os.path.join(save_dir, 'atme_vol.nii.gz'))
+
 
 
 if __name__ == '__main__':

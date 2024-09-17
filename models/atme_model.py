@@ -118,7 +118,7 @@ class AtmeModel(BaseModel):
             self.print_networks(opt.verbose)
         if not self.isTrain or opt.continue_train:
             load_suffix = 'iter_%d' % opt.load_iter if opt.load_iter > 0 else opt.epoch
-            self.load_networks(load_suffix)
+            self.load_networks(load_suffix, pre_train_G_path=opt.pre_train_G_path, pre_train_W_path=opt.pre_train_W_path)
 
     def _save_DW(self, visuals):
         to_save = (self.batch_indices.view(1, -1) == self.save_DW_idx.view(-1, 1)).any(dim=0)

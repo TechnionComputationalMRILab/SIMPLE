@@ -6,6 +6,16 @@ import torch
 import os
 
 
+def save_nifti(volume, path):
+    volume_nda = volume.numpy()
+    volume_sitk = sitk.GetImageFromArray(volume_nda)
+
+    writer = sitk.ImageFileWriter()
+    writer.SetFileName(path)
+    writer.Execute(volume_sitk)
+
+    return
+
 def minmax_scaler(arr, *, vmin=0, vmax=1):
     arr_min, arr_max = arr.min(), arr.max()
     return ((arr - arr_min) / (arr_max - arr_min)) * (vmax - vmin) + vmin
@@ -195,7 +205,7 @@ def reconstruct_volume(opt, patches_3d_list, output_shape):
 
 def pad_volume(vol, dim):
     vol = change_dim(vol, dim)
-    
+
     slices_num = vol.shape[0]
     if slices_num > dim:
         start = int((slices_num - dim)/2)
@@ -251,12 +261,14 @@ def calc_dims(case, opt):
         start_index[i] = int((new_dim[i] - old_dim[i]) / 2)
     return new_dim, old_dim, start_index
 
-def simple_test_preprocess(case, opt, global_min, global_max):
-    _, _, _, interp_vol_nda = extract_volume_from_dicom(case, opt.data_format, _min=global_min, _max=global_max)
+def simple_test_preprocess(case, opt):
+    _, _, _, interp_vol_nda = extract_volume_from_dicom(case, opt.data_format, _min=opt.global_min, _max=opt.global_max)
+
     interp_vol_nda = change_dim(interp_vol_nda, target_dim=opt.vol_cube_dim)
     interp_vol = torch.from_numpy(interp_vol_nda).to(torch.float32)
 
     new_dim, old_dim, s = calc_dims(interp_vol, opt)
+
     padded_case = torch.zeros((1, 1, new_dim[0], new_dim[1], new_dim[2])) - 1
     padded_case[:, :, s[0]:(s[0] + old_dim[0]), s[1]:(s[1] + old_dim[1]), s[2]:(s[2] + old_dim[2])] = interp_vol
 
@@ -276,7 +288,8 @@ def simple_train_preprocess(opt):
 
     mkdirs([opt.data_dir, save_train_dir])
 
-    global_min, global_max = find_grayscale_limits(cor_cases_paths, opt.data_format)
+    if opt.global_min == 0 and opt.global_max == 0:
+        opt.global_min, opt.global_max = find_grayscale_limits(cor_cases_paths, opt.data_format)
 
     save_idx = 0
 
@@ -284,7 +297,7 @@ def simple_train_preprocess(opt):
         cor_case = cor_cases_paths[case_idx]
         print(f'case no: {case_idx} / {cases_num}, {cor_case=}')
 
-        _, _, _, interp_vol_nda = extract_volume_from_dicom(cor_case, opt.data_format, _min=global_min, _max=global_max)
+        _, _, _, interp_vol_nda = extract_volume_from_dicom(cor_case, opt.data_format, _min=opt.global_min, _max=opt.global_max)
         interp_vol_nda = change_dim(interp_vol_nda, target_dim=opt.vol_cube_dim)
         interp_vol = torch.from_numpy(interp_vol_nda).to(torch.float32).cpu().detach()
 
@@ -362,11 +375,12 @@ def atme_train_preprocess(opt):
 
     save_idx = 0
 
-    global_min, global_max = find_grayscale_limits(cases_paths, opt.data_format)
+    if opt.global_min == 0 and opt.global_max == 0:
+        opt.global_min, opt.global_max = find_grayscale_limits(cases_paths, opt.data_format)
 
     for i, case in enumerate(cases_paths):
         print(f'case no: {i} / {len(cases_paths)}, {case=}')
-        org_vol, interp_vol, org_vol_nda, interp_vol_nda = extract_volume_from_dicom(case, opt.data_format, _min=global_min, _max=global_max)
+        org_vol, interp_vol, org_vol_nda, interp_vol_nda = extract_volume_from_dicom(case, opt.data_format, _min=opt.global_min, _max=opt.global_max)
 
         org_slices_num = org_vol.GetSize()[2]
         interp_slices_num = interp_vol.GetSize()[2]

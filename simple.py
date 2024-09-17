@@ -5,7 +5,7 @@ import random
 import numpy as np
 import pandas as pd
 from data import create_simple_train_dataset, create_simple_test_dataset
-from data.preprocess import reconstruct_volume, pad_volume, find_grayscale_limits
+from data.preprocess import reconstruct_volume, pad_volume, find_grayscale_limits, save_nifti
 from models import create_model
 from util.visualizer import Visualizer, plot_simple_train_results, plot_simple_test_results
 from util.util import mkdir, mkdirs
@@ -83,17 +83,16 @@ def test(opt):
     model = create_model(opt)
     model.setup(opt)
 
-    # visualizer = Visualizer(opt) #TODO: to add a plot of simple results
-
     df = pd.read_csv(os.path.join(opt.csv_name), low_memory=False)
     cor_cases_paths = df.loc[:, 'coronal']
 
-    global_min, global_max = find_grayscale_limits(cor_cases_paths, opt.data_format)
+    if opt.global_min == 0 and opt.global_max == 0:
+        opt.global_min, opt.global_max = find_grayscale_limits(cor_cases_paths, opt.data_format)
 
     for case_idx, cor_case in enumerate(cor_cases_paths):
         print(f'case no: {case_idx} / {len(cor_cases_paths)}, {cor_case=}')
 
-        data_loader = create_simple_test_dataset(cor_case, opt, global_min, global_max)
+        data_loader = create_simple_test_dataset(cor_case, opt)
 
         output_patches_3d = []
         for l, data in enumerate(data_loader):
@@ -104,18 +103,23 @@ def test(opt):
 
         DS = data_loader.dataset
         interp_vol = DS.padded_case
+
         recon_vol = reconstruct_volume(opt, output_patches_3d, interp_vol.shape)
 
         interp_vol = pad_volume(interp_vol.squeeze(), opt.vol_cube_dim)
         recon_vol = pad_volume(recon_vol.squeeze(), opt.vol_cube_dim)
-        
+
         plot_simple_test_results(interp_vol, recon_vol, figures_path, case_idx)
 
         save_dir = os.path.join(opt.data_dir, 'test', f'case_{case_idx}')
         mkdir(save_dir)
 
         torch.save(recon_vol.cpu().detach(), os.path.join(save_dir, 'simple_vol.pt'))
+        torch.save(interp_vol.cpu().detach(), os.path.join(save_dir, 'interp_vol.pt'))
 
+        if opt.save_nifti:
+            save_nifti(recon_vol, os.path.join(save_dir, 'simple_vol.nii.gz'))
+            save_nifti(interp_vol, os.path.join(save_dir, 'interp_vol.nii.gz'))
 
 if __name__ == '__main__':
     simple_opt = SimpleOptions().parse()
