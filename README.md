@@ -48,13 +48,13 @@ For both models you must specify the following base flags:
 
 --vol_cube_dim (the dimension of the resulted cube MRI volume - can be any value above 256). *Pay attention that different cube dimension may require different number of discriminator layers for ATME training (for example: 256 require 3 discriminator layers, 512 require 4 discriminator layers)
 
---calculate_dataset or --no-calculate_dataset (whether to perform pre-processing for the dataset or not. Data pre-proceesing must be done before the training).
+--calculate_dataset or --no-calculate_dataset (whether to perform pre-processing for the dataset or not. Data pre-processing must be done before the training).
 
 *For more flags, please see 'options' directory.
 
-- For training ATME, run 'train.py atme' command with the base flags and specify also the following flags: --plane (coronal/axial/sagittal), --TestAfterTrain (wheter to perform evaluation to the ATME model immediatly after its training).
+- For training ATME, run 'train.py atme' command with the base flags and specify also the following flags: --plane (coronal/axial/sagittal), --TestAfterTrain (whether to perform evaluation to the ATME model immediately after its training).
 
-   *In order to evaluate the ATME model seperatly you can add the flag --no-isTrain instead the flag --isTrain to train.py script or to use the test.py script (see evaluation section).
+   *In order to evaluate the ATME model separately you can add the flag --no-isTrain instead the flag --isTrain to train.py script or to use the test.py script (see evaluation section).
 
    **You can train SIMPLE model only after evaluating ATME model in each plane.
 

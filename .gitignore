@@ -2,3 +2,9 @@
 data/dicom_organize.py
 outputs/*
 *.pyc
+/pretrained
+*.csv
+/options/__pycache__
+*.pyc
+*.gz
+*.pyc
