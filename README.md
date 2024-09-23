@@ -14,8 +14,6 @@ To use this project, use the following steps:
    git clone https://github.com/TechnionComputationalMRILab/SIMPLE.git
 2. **Install Dependencies (via conda)**
    ```sh
-   pip install torch==2.3.1+cu118 torchvision --index-url https://download.pytorch.org/whl/cu118
-
    conda env create -f environment.yml
    
 ## Pre-Processing
