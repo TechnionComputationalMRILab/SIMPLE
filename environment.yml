@@ -182,7 +182,7 @@ dependencies:
     - flit-core==3.6.0
     - fonttools==4.25.0
     - gans-eval==0.0.3
-    - generative==0.2.2
+    - generative
     - google-auth==2.17.3
     - google-auth-oauthlib==1.0.0
     - gpustat==1.1
@@ -237,4 +237,3 @@ dependencies:
     - wcwidth==0.2.6
     - werkzeug==2.1.2
     - zipp==3.15.0
-prefix: /home/be.rotem/.conda/envs/3Dmorph_new_env
