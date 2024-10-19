@@ -369,6 +369,34 @@ def find_grayscale_limits(cases, data_format='dicom'):
 
     return global_min, global_max
 
+def change_dim(image, target_dim):
+    if len(image.shape) == 2:
+        target_size = (target_dim, target_dim)
+    elif len(image.shape) == 3:
+        target_size = (image.shape[0], target_dim, target_dim)
+    else:
+        target_size = None
+        print(f'number of image dimensions is {len(image.shape)} != 2 or 3')
+
+    current_size = image.shape
+
+    # Initialize the output array with zeros
+    if 'torch' in str(image.dtype):
+        output_image = torch.zeros(target_size, dtype=image.dtype) - 1
+    else:
+        output_image = np.zeros(target_size, dtype=image.dtype) - 1
+
+    # Calculate the amount to pad or crop for each dimension
+    pad_crop = [((t - c) // 2, (t - c + 1) // 2) for t, c in zip(target_size, current_size)]
+
+    input_slices = tuple(slice(max(0, -p[0]), c - max(0, -p[1])) for p, c in zip(pad_crop, current_size))
+    output_slices = tuple(slice(max(0, p[0]), t - max(0, p[1])) for p, t in zip(pad_crop, target_size))
+
+    # Copy the data from the input to the output
+    output_image[output_slices] = image[input_slices]
+
+    return output_image
+
 def atme_train_preprocess(opt):
     df = pd.read_csv(os.path.join(opt.csv_name), low_memory=False)
     cases_paths = df.loc[:, opt.plane]
