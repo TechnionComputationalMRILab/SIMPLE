@@ -128,6 +128,7 @@ class AtmeTrainDataset(Dataset):
 class AtmeTestDataset(Dataset):
     def __init__(self, opt, case, case_index, transform=None, target_transform=None):
         _, _, _, case_interp_vol = extract_volume_from_dicom(case, opt.data_format, _min=opt.global_min, _max=opt.global_max)
+        case_interp_vol = change_dim(case_interp_vol, target_dim=opt.vol_cube_dim)
         self.case_interp_vol = torch.from_numpy(case_interp_vol).to(torch.float32)
         self.plane = opt.plane
         self.start_idx = None
