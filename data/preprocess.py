@@ -192,17 +192,34 @@ def combine_patches_3d(x, kernel_size, output_shape, padding=0, stride=1, dilati
 
     return x
 
+#def reconstruct_volume(opt, patches_3d_list, output_shape):
+#    patches_3d = torch.cat(patches_3d_list)
+#    output_vol = combine_patches_3d(patches_3d, opt.patch_size, output_shape,
+#                                    stride=int(opt.patch_size * (1 - opt.overlap_ratio)))
+#
+#    ones = torch.ones_like(patches_3d).cpu()
+#    ones_vol = combine_patches_3d(ones, opt.patch_size, output_shape, stride=int(opt.patch_size * (1 - opt.overlap_ratio)))
+#    recon_vol = output_vol.cpu() / ones_vol
+#
+#    return recon_vol
+
 def reconstruct_volume(opt, patches_3d_list, output_shape):
+    overlap = int(opt.patch_size * opt.overlap_ratio)
+    zero = int(overlap / 3)
+
     patches_3d = torch.cat(patches_3d_list)
+    patches_3d[:, :, (opt.patch_size - zero):, (opt.patch_size - zero):, (opt.patch_size - zero):] = 0
     output_vol = combine_patches_3d(patches_3d, opt.patch_size, output_shape,
                                     stride=int(opt.patch_size * (1 - opt.overlap_ratio)))
 
     ones = torch.ones_like(patches_3d).cpu()
+    ones[:, :, (opt.patch_size-zero):, (opt.patch_size-zero):, (opt.patch_size-zero):] = 0
     ones_vol = combine_patches_3d(ones, opt.patch_size, output_shape, stride=int(opt.patch_size * (1 - opt.overlap_ratio)))
+    ones_vol[ones_vol == 0] = 1
     recon_vol = output_vol.cpu() / ones_vol
 
     return recon_vol
-
+    
 def pad_volume(vol, dim):
     vol = change_dim(vol, dim)
 
