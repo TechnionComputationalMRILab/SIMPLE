@@ -461,12 +461,15 @@ def atme_train_preprocess(opt):
 
             if opt.plane in ['axial', 'sagittal']:
                 strided_interp_img = np.zeros_like(interp_img)
-                if opt.plane == 'axial':
+                if opt.plane == 'sagittal':
                     interp_img = np.transpose(interp_img)
                     strided_interp_img = np.transpose(strided_interp_img)
-                for k in range(0, opt.vol_cube_dim, opt.stride):
-                    strided_interp_img[k:k + opt.stride, :] = interp_img[k, :]
-                if opt.plane == 'axial':
+                    
+                half = int(np.floor(opt.stride / 2))
+                for k in range(half, opt.vol_cube_dim - half, opt.stride):
+                    strided_interp_img[(k-half):(k + half + 1), :] = interp_img[k, :]
+                    
+                if opt.plane == 'sagittal':
                     strided_interp_img = np.transpose(strided_interp_img)
                 interp_img = strided_interp_img
 
