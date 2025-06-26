@@ -1,4 +1,4 @@
-# SIMPLE_3Planes
+# SIMPLE
 SIMPLE is a simultaneous multi-plane self-supervised learning method for isotropic MRI restoration from anisotropic data.
 
 ![image](figures/model_arch_with_loss.png)
