@@ -1,4 +1,4 @@
-name: 3Dmorph_new_env
+name: SIMPLE_3Planes_env
 channels:
   - simpleitk
   - anaconda

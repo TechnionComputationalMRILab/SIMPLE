@@ -117,27 +117,27 @@ def test(opt):
     mkdir(save_fig_dir)
 
     df = pd.read_csv(os.path.join(opt.csv_name), low_memory=False)
-    cor_cases_paths = df.loc[:, 'coronal']
+    cases_paths = df.loc[:, opt.eval_plane]
+    ax_cases_paths = df.loc[:, 'axial']
 
-    plot_slice = 150
+    plot_slice = 100
 
     if opt.global_min == 0 and opt.global_max == 0:
-        opt.global_min, opt.global_max = find_grayscale_limits(cor_cases_paths, opt.data_format)
+        opt.global_min, opt.global_max = find_grayscale_limits(cases_paths, opt.data_format)
 
-    for i, cor_case in enumerate(cor_cases_paths):
-        print(f'case no: {i} / {len(cor_cases_paths)}, {cor_case=}')
+    for i, cor_case in enumerate(cases_paths):
+        print(f'case no: {i} / {len(cases_paths)}, {cor_case=}')
 
         save_dir = os.path.join(opt.data_dir, 'generation', f'case_{i}')
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
-        dataset = create_atme_test_dataset(opt, cor_case, i)
+        dataset = create_atme_test_dataset(opt, cor_case, i, ax_cases_paths[i])
         model = create_model(opt, dataset)
         model.setup(opt)
         model.eval()
 
         gen_vol = torch.zeros((len(dataset), opt.vol_cube_dim, opt.vol_cube_dim))
-
         for j, data in enumerate(dataset):
             model.set_input(data)
             model.test()
@@ -147,13 +147,16 @@ def test(opt):
                 visuals = model.get_current_visuals()
                 save_atme_images(visuals, save_fig_dir, j, case_num=i)
 
-        if opt.plane == 'axial':
-            gen_vol = dataset.dataset.crop_volume(gen_vol)
+
+        gen_vol = dataset.dataset.crop_volume(gen_vol)
+        # case_interp_vol = dataset.dataset.crop_volume(dataset.dataset.case_interp_vol)
 
         torch.save(gen_vol, os.path.join(save_dir, 'atme_vol.pt'))
+        # torch.save(case_interp_vol, os.path.join(save_dir, 'interp_vol.pt'))
 
         if opt.save_nifti:
             save_nifti(gen_vol, os.path.join(save_dir, 'atme_vol.nii.gz'))
+            # save_nifti(case_interp_vol, os.path.join(save_dir, 'interp_vol.nii.gz'))
 
 
 

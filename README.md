@@ -1,4 +1,4 @@
-# SIMPLE
+# SIMPLE_3Planes
 SIMPLE is a simultaneous multi-plane self-supervised learning method for isotropic MRI restoration from anisotropic data.
 
 ![image](figures/model_arch_with_loss.png)
@@ -11,7 +11,7 @@ To use this project, use the following steps:
 
 1. **Clone the Repository:**
    ```sh
-   git clone https://github.com/TechnionComputationalMRILab/SIMPLE.git
+   git clone https://github.com/RotemBenisty/SIMPLE_3Planes.git
 2. **Install Dependencies (via conda)**
    ```sh
    conda env create -f environment.yml
@@ -34,7 +34,11 @@ For both models you must specify the following base flags:
 
 --isTrain
 
+--main_root (main directory name for all models outputs)
+
 --model_root (directory name for model outputs)
+
+--eval_plane (evaluation plane)
 
 --csv_name (csv file name)
 
@@ -44,7 +48,7 @@ For both models you must specify the following base flags:
 
 --phase (train/test)
 
---vol_cube_dim (the dimension of the resulted cube MRI volume - can be any value above 256). *Pay attention that different cube dimension may require different number of discriminator layers for ATME training (for example: 256 require 3 discriminator layers, 512 require 4 discriminator layers)
+--vol_cube_dim (the dimension of the resulted cube MRI volume - can be any value above 256). *Pay attention that different cube dimension may require different number of discriminator layers (--n_layers_D) for ATME training (for example: 256 require 3 discriminator layers, 512 require 4 discriminator layers)
 
 --calculate_dataset or --no-calculate_dataset (whether to perform pre-processing for the dataset or not. Data pre-processing must be done before the training).
 
@@ -59,15 +63,15 @@ For both models you must specify the following base flags:
    Example:
 
    ```sh
-   python train.py atme --isTrain --plane=coronal --model_root=atme_coronal_output --csv_name=<file_name>.csv --vol_cube_dim=256 --calculate_dataset 
+   python train.py atme --isTrain --eval_plane=coronal --plane=axial --main_root=outputs --model_root=atme_axial_output --csv_name=<file_name>.csv --vol_cube_dim=512 --data_format=nifti --calculate_dataset 
    ```
 
-- For training SIMPLE, run 'train.py simple' command with the base flags and specify also the flag --planes_number (specify how many planes the model is based on).
+- For training SIMPLE, run 'train.py simple' command with the base flags and specify also the flags --planes (specify which planes the model is based on), --atme_cor_root/--atme_ax_root/--atme_sag_root (the coronal/axial/sagittal ATME outputs directory).
 
   Example:
 
    ```sh
-   python train.py simple --isTrain --planes_number=2 --model_root=simple_output --csv_name=<file_name>.csv --vol_cube_dim=256 --calculate_dataset 
+   python train.py simple --isTrain --eval_plane=coronal --planes=coronal,axial,sagittal --main_root=outputs --model_root=simple_output --csv_name=<file_name>.csv --vol_cube_dim=512 --calculate_dataset --atme_cor_root=atme_coronal_output --atme_ax_root=atme_axial_output --atme_sag_root=atme_sagittal_output --data_format=nifti 
    ```
 
 ## Evaluation
@@ -76,11 +80,11 @@ For both models you must specify the following base flags:
   Example:
 
    ```sh
-   python test.py atme --plane=coronal --model_root=atme_coronal_output --csv_name=<file_name>.csv --vol_cube_dim=256
+   python test.py atme --eval_plane=coronal --plane=axial --main_root=outputs --model_root=atme_axial_output --csv_name=<file_name>.csv --vol_cube_dim=512 --data_format=nifti
    ```
-- for evaluating SIMPLE, run 'test.py simple' command with the base flags and specify also the flag --planes_number (specify how many planes the model is based on).
+- for evaluating SIMPLE, run 'test.py simple' command with the base flags and specify also the flag --planes (specify which planes the model is based on), --atme_cor_root/--atme_ax_root/--atme_sag_root (the coronal/axial/sagittal ATME outputs directory).
    ```sh
-   python test.py simple --planes_number=2 --model_root=simple_output --csv_name=<file_name>.csv --vol_cube_dim=256
+   python test.py simple --eval_plane=coronal --planes=coronal,axial,sagittal --main_root=outputs --model_root=simple_output --csv_name=<file_name>.csv --vol_cube_dim=512 --data_format=nifti
    ```
 
 ## Pre-Trained Model

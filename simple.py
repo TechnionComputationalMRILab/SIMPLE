@@ -8,7 +8,7 @@ from data import create_simple_train_dataset, create_simple_test_dataset
 from data.preprocess import reconstruct_volume, pad_volume, find_grayscale_limits, save_nifti
 from models import create_model
 from util.visualizer import Visualizer, plot_simple_train_results, plot_simple_test_results
-from util.util import mkdir, mkdirs
+from util.util import mkdir
 from options.simple_options import SimpleOptions
 
 
@@ -35,6 +35,8 @@ def train(opt):
     figures_path = os.path.join(opt.save_dir, 'figures', 'train')
     mkdir(figures_path)
 
+    slice_index = int(opt.patch_size / 2)
+
     for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):
         epoch_start_time = time.time()
         iter_data_time = time.time()
@@ -53,8 +55,8 @@ def train(opt):
             model.set_input(data)
             model.optimize_parameters()
 
-            if i == 0 and epoch % 10 == 0:
-                plot_simple_train_results(model, epoch, figures_path)
+            if i == 0 and epoch % 5 == 0:
+                plot_simple_train_results(model, epoch, figures_path, opt.planes, slice_index)
 
             if total_iters % opt.print_freq == 0:
                 losses = model.get_current_losses()
@@ -84,22 +86,27 @@ def test(opt):
     model.setup(opt)
 
     df = pd.read_csv(os.path.join(opt.csv_name), low_memory=False)
-    cor_cases_paths = df.loc[:, 'coronal']
+    cases_paths = df.loc[:, opt.eval_plane]
 
     if opt.global_min == 0 and opt.global_max == 0:
-        opt.global_min, opt.global_max = find_grayscale_limits(cor_cases_paths, opt.data_format)
+        opt.global_min, opt.global_max = find_grayscale_limits(cases_paths, opt.data_format)
 
-    for case_idx, cor_case in enumerate(cor_cases_paths):
-        print(f'case no: {case_idx} / {len(cor_cases_paths)}, {cor_case=}')
+    for case_idx, case in enumerate(cases_paths):
+        print(f'case no: {case_idx} / {len(cases_paths)}, {case=}')
 
-        data_loader = create_simple_test_dataset(cor_case, opt)
+        data_loader = create_simple_test_dataset(case, opt)
 
         output_patches_3d = []
         for l, data in enumerate(data_loader):
             model.set_requires_grad(model.netG, False)
             model.set_input(data)
             model.forward()
-            output_patches_3d.append(model.fake_B_cor)
+            if opt.eval_plane == 'coronal':
+                output_patches_3d.append(model.fake_B_cor)
+            elif opt.eval_plane == 'axial':
+                output_patches_3d.append(model.fake_B_ax)
+            elif opt.eval_plane == 'sagittal':
+                output_patches_3d.append(model.fake_B_sag)
 
         DS = data_loader.dataset
         interp_vol = DS.padded_case
@@ -109,16 +116,18 @@ def test(opt):
         interp_vol = pad_volume(interp_vol.squeeze(), opt.vol_cube_dim)
         recon_vol = pad_volume(recon_vol.squeeze(), opt.vol_cube_dim)
 
-        plot_simple_test_results(interp_vol, recon_vol, figures_path, case_idx)
+        plot_simple_test_results(interp_vol, recon_vol, figures_path, case_idx, opt)
 
         save_dir = os.path.join(opt.data_dir, 'test', f'case_{case_idx}')
         mkdir(save_dir)
 
-        torch.save(recon_vol.cpu().detach(), os.path.join(save_dir, 'simple_vol.pt'))
+
+
+        torch.save(recon_vol.cpu().detach(), os.path.join(save_dir, f'simple_vol.pt'))
         torch.save(interp_vol.cpu().detach(), os.path.join(save_dir, 'interp_vol.pt'))
 
         if opt.save_nifti:
-            save_nifti(recon_vol, os.path.join(save_dir, 'simple_vol.nii.gz'))
+            save_nifti(recon_vol, os.path.join(save_dir, f'simple_vol.nii.gz'))
             save_nifti(interp_vol, os.path.join(save_dir, 'interp_vol.nii.gz'))
 
 if __name__ == '__main__':
