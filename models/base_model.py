@@ -167,7 +167,6 @@ class BaseModel(ABC):
 
     def __patch_instance_norm_state_dict(self, state_dict, module, keys, i=0):
         """Fix InstanceNorm checkpoints incompatibility (prior to 0.4)"""
-        # print(f'{keys=}')
         key = keys[i]
         if i + 1 == len(keys):  # at the end, pointing to a parameter/buffer
             if module.__class__.__name__.startswith('InstanceNorm') and \
@@ -196,6 +195,7 @@ class BaseModel(ABC):
                     load_filename = '%s_net_%s.pth' % (epoch, name)
                     load_path = os.path.join(self.save_dir, load_filename)
                 net = getattr(self, 'net' + name)
+
                 if isinstance(net, torch.nn.DataParallel):
                     net = net.module
                 print('loading the model from %s' % load_path)
@@ -217,7 +217,6 @@ class BaseModel(ABC):
             epoch (int) -- current epoch; used in the file name '%s_net_%s.pth' % (epoch, name)
         """
         for i, name in enumerate(networks_names):
-            # if name == 'D_ax': continue
             if isinstance(name, str):
                 load_path = load_paths[i]
                 net = getattr(self, 'net' + name)

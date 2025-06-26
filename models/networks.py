@@ -119,9 +119,12 @@ def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
     if len(gpu_ids) > 1:
         assert(torch.cuda.is_available())
         print("Let's use", len(gpu_ids), "GPUs!", gpu_ids)
+        net.to(gpu_ids[0])
         net = torch.nn.DataParallel(net, gpu_ids)
-    device = torch.device(f"cuda:{gpu_ids[0]}" if torch.cuda.is_available() else "cpu")
-    net.to(device)
+    elif len(gpu_ids) == 1:
+        print("Let's use", len(gpu_ids), "GPUs!", gpu_ids)
+        device = torch.device(f"cuda:{gpu_ids[0]}" if torch.cuda.is_available() else "cpu")
+        net.to(device)
     init_weights(net, init_type, init_gain=init_gain)
     return net
 
@@ -160,6 +163,8 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
         net = ResnetGenerator3D(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9)
     elif netG == 'resnet_6blocks':
         net = ResnetGenerator3D(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=6)
+    elif netG == 'unet_32':
+        net = UnetGenerator3D(input_nc, output_nc, 5, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
     elif netG == 'unet_64':
         net = UnetGenerator3D(input_nc, output_nc, 6, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
     elif netG == 'unet_128':
@@ -552,14 +557,11 @@ class UnetSkipConnectionBlock3D(nn.Module):
         self.model = nn.Sequential(*model)
 
     def forward(self, x):
-        # print(f'{x.shape=}')
         if self.outermost:
             out = self.model(x)
-            # print(f'{out.shape=}')
             return out
         else:   # add skip connections
             out = torch.cat([x, self.model(x)], 1)
-            # print(f'{out.shape=}')
             return out
 
 class NLayerDiscriminator(nn.Module):
