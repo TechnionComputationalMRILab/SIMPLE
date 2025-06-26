@@ -35,83 +35,95 @@ def save_atme_images(visuals, results_dir, slice_num, case_num=None, iter_num=No
     plt.savefig(img_pdf_path)
     plt.close()
 
-def plot_simple_train_results(model, epoch, figures_path):
+def plot_simple_train_results(model, epoch, figures_path, planes, slice_index):
     print('-------------------PLOT SIMPLE TRAINING RESULTS----------------------')
-    fig, axs = plt.subplots(2, 3)
 
-    interp_cor_img = model.real_A_cor[0, 0, 32, :, :].squeeze().cpu().detach().numpy()
-    axs[0, 0].imshow(interp_cor_img, cmap="gray")
-    axs[0, 0].set_xticks([])
-    axs[0, 0].set_yticks([])
-    axs[0, 0].set_title(f'Interpolation')
-    axs[0, 0].set_ylabel('Coronal', fontsize="20")
+    fig, axs = plt.subplots(len(planes), 3)
 
-    atme_cor_img = model.real_B_cor[0, 0, 32, :, :].cpu().detach().numpy()
-    axs[0, 1].imshow(atme_cor_img, cmap="gray")
-    axs[0, 1].set_xticks([])
-    axs[0, 1].set_yticks([])
-    axs[0, 1].set_title(f'ATME')
+    for i, plane in enumerate(planes):
+        if plane == 'coronal':
+            interp_img = model.real_A_cor[0, 0, slice_index, :, :].squeeze().cpu().detach().numpy()
+            atme_img = model.real_B_cor[0, 0, slice_index, :, :].cpu().detach().numpy()
+            simple_img = model.fake_B_cor[0, 0, slice_index, :, :].squeeze().cpu().detach().numpy()
+        elif plane == 'axial':
+            interp_img = model.real_A_ax[0, 0, slice_index, :, :].squeeze().cpu().detach().numpy()
+            atme_img = model.real_B_ax[0, 0, slice_index, :, :].cpu().detach().numpy()
+            simple_img = model.fake_B_ax[0, 0, slice_index, :, :].squeeze().cpu().detach().numpy()
+        elif plane == 'sagittal':
+            interp_img = model.real_A_sag[0, 0, slice_index, :, :].squeeze().cpu().detach().numpy()
+            atme_img = model.real_B_sag[0, 0, slice_index, :, :].cpu().detach().numpy()
+            simple_img = model.fake_B_sag[0, 0, slice_index, :, :].squeeze().cpu().detach().numpy()
 
-    gen_cor_img = model.fake_B_cor[0, 0, 32, :, :].squeeze().cpu().detach().numpy()
-    axs[0, 2].imshow(gen_cor_img, cmap="gray")
-    axs[0, 2].set_xticks([])
-    axs[0, 2].set_yticks([])
-    axs[0, 2].set_title(f'SIMPLE')
+        axs[i, 0].imshow(interp_img, vmin=-1, vmax=1, cmap="gray")
+        axs[i, 0].set_xticks([])
+        axs[i, 0].set_yticks([])
+        axs[i, 0].set_ylabel(f'{plane}', fontsize="20")
+        axs[i, 0].set_title(f'Interpolation')
 
-    interp_ax_img = model.real_A_ax[0, 0, 32, :, :].squeeze().cpu().detach().numpy()
-    axs[1, 0].imshow(interp_ax_img, cmap="gray")
-    axs[1, 0].set_xticks([])
-    axs[1, 0].set_yticks([])
-    axs[1, 0].set_title(f'Interpolation')
-    axs[1, 0].set_ylabel('Axial', fontsize="20")
+        axs[i, 1].imshow(atme_img, vmin=-1, vmax=1, cmap="gray")
+        axs[i, 1].set_xticks([])
+        axs[i, 1].set_yticks([])
+        axs[i, 1].set_title(f'ATME')
 
-    atme_ax_img = model.real_B_ax[0, 0, 32, :, :].cpu().detach().numpy()
-    axs[1, 1].imshow(atme_ax_img, cmap="gray")
-    axs[1, 1].set_xticks([])
-    axs[1, 1].set_yticks([])
-    axs[1, 1].set_title(f'ATME')
-
-    gen_ax_img = model.fake_B_ax[0, 0, 32, :, :].squeeze().cpu().detach().numpy()
-    axs[1, 2].imshow(gen_ax_img, cmap="gray")
-    axs[1, 2].set_xticks([])
-    axs[1, 2].set_yticks([])
-    axs[1, 2].set_title(f'SIMPLE')
+        axs[i, 2].imshow(simple_img, vmin=-1, vmax=1, cmap="gray")
+        axs[i, 2].set_xticks([])
+        axs[i, 2].set_yticks([])
+        axs[i, 2].set_title(f'SIMPLE')
 
     fig.align_ylabels()
     plt.savefig(os.path.join(figures_path, f'results_epoch_{epoch}.png'))
     plt.close()
 
-def plot_simple_test_results(interp_vol, simple_vol, figures_path, case_idx):
-    fig, axs = plt.subplots(2, 2)
+def plot_simple_test_results(interp_vol, simple_vol, figures_path, case_idx, opt):
+    fig, axs = plt.subplots(len(opt.planes), 2)
 
-    interp_cor_slice = interp_vol[150, :, :].cpu().detach().numpy()
-    axs[0, 0].imshow(interp_cor_slice, vmin=-1, vmax=1, cmap="gray")
-    axs[0, 0].set_xticks([])
-    axs[0, 0].set_yticks([])
-    axs[0, 0].set_title(f'Interpolation')
-    axs[0, 0].set_ylabel('Coronal', fontsize="10")
+    for i, plane in enumerate(opt.planes):
+        if opt.eval_plane == 'coronal':
+            if plane == 'coronal':
+                interp_slice = interp_vol[150, :, :].cpu().detach().numpy()
+                simple_slice = simple_vol[150, :, :].cpu().detach().numpy()
+            elif plane == 'axial':
+                interp_slice = torch.movedim(interp_vol, (0, 1, 2), (1, 0, 2))[150, :, :].cpu().detach().numpy()
+                simple_slice = torch.movedim(simple_vol, (0, 1, 2), (1, 0, 2))[150, :, :].cpu().detach().numpy()
+            elif plane == 'sagittal':
+                interp_slice = torch.movedim(interp_vol, (0, 1, 2), (2, 1, 0))[150, :, :].cpu().detach().numpy()
+                simple_slice = torch.movedim(simple_vol, (0, 1, 2), (2, 1, 0))[150, :, :].cpu().detach().numpy()
 
-    simple_cor_slice = simple_vol[150, :, :].cpu().detach().numpy()
-    axs[0, 1].imshow(simple_cor_slice, vmin=-1, vmax=1, cmap="gray")
-    axs[0, 1].set_xticks([])
-    axs[0, 1].set_yticks([])
-    axs[0, 1].set_title(f'SIMPLE')
+        elif opt.eval_plane == 'axial':
+            if plane == 'coronal':
+                interp_slice = torch.movedim(interp_vol, (0, 1, 2), (1, 0, 2))[150, :, :].cpu().detach().numpy()
+                simple_slice = torch.movedim(simple_vol, (0, 1, 2), (1, 0, 2))[150, :, :].cpu().detach().numpy()
+            elif plane == 'axial':
+                interp_slice = interp_vol[150, :, :].cpu().detach().numpy()
+                simple_slice = simple_vol[150, :, :].cpu().detach().numpy()
+            elif plane == 'sagittal':
+                interp_slice = torch.movedim(interp_vol, (0, 1, 2), (1, 2, 0))[150, :, :].cpu().detach().numpy()
+                simple_slice = torch.movedim(simple_vol, (0, 1, 2), (1, 2, 0))[150, :, :].cpu().detach().numpy()
 
-    interp_ax_slice = torch.movedim(interp_vol, (0, 1, 2), (1, 0, 2))[150, :, :].cpu().detach().numpy()
-    axs[1, 0].imshow(interp_ax_slice, vmin=-1, vmax=1, cmap="gray")
-    axs[1, 0].set_xticks([])
-    axs[1, 0].set_yticks([])
-    axs[1, 0].set_title(f'Interpolation')
-    axs[1, 0].set_ylabel('Axial', fontsize="10")
+        elif opt.eval_plane == 'sagittal':
+            if plane == 'coronal':
+                interp_slice = torch.movedim(interp_vol, (0, 1, 2), (2, 1, 0))[100, :, :].cpu().detach().numpy()
+                simple_slice = torch.movedim(simple_vol, (0, 1, 2), (2, 1, 0))[100, :, :].cpu().detach().numpy()
+            elif plane == 'axial':
+                interp_slice = torch.movedim(interp_vol, (0, 1, 2), (2, 0, 1))[100, :, :].cpu().detach().numpy()
+                simple_slice = torch.movedim(simple_vol, (0, 1, 2), (2, 0, 1))[100, :, :].cpu().detach().numpy()
+            elif plane == 'sagittal':
+                interp_slice = interp_vol[150, :, :].cpu().detach().numpy()
+                simple_slice = simple_vol[150, :, :].cpu().detach().numpy()
 
-    simple_ax_slice = torch.movedim(simple_vol, (0, 1, 2), (1, 0, 2))[150, :, :].cpu().detach().numpy()
-    axs[1, 1].imshow(simple_ax_slice, vmin=-1, vmax=1, cmap="gray")
-    axs[1, 1].set_xticks([])
-    axs[1, 1].set_yticks([])
-    axs[1, 1].set_title(f'SIMPLE')
+        axs[i, 0].imshow(interp_slice, vmin=-1, vmax=1, cmap="gray")
+        axs[i, 0].set_xticks([])
+        axs[i, 0].set_yticks([])
+        axs[i, 0].set_ylabel(f'{plane}', fontsize="10")
+        axs[i, 0].set_title(f'Interpolation')
+
+        axs[i, 1].imshow(simple_slice, vmin=-1, vmax=1, cmap="gray")
+        axs[i, 1].set_xticks([])
+        axs[i, 1].set_yticks([])
+        axs[i, 1].set_title(f'SIMPLE')
 
     fig.align_ylabels()
-    plt.savefig(os.path.join(figures_path, f'case_{case_idx}.png'))
+    plt.savefig(os.path.join(figures_path, f'case_{case_idx}_{opt.overlap_ratio}_gradual_{opt.overlap_ratio}_slice_100.png')) #_zero_0.33
     plt.close()
 
 class Visualizer():

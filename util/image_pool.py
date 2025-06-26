@@ -70,8 +70,6 @@ class DiscPool(Dataset):
             isTrain: whether this class is instanced during the train or test phase
             disc_out_size: the size of the ouput tensor of the discriminator
         """
-        # from data import create_dataset
-        # self.dataset_len = dataset_len = len(create_dataset(opt))
         self.dataset_len = len(dataset)
 
         if isTrain:
