@@ -11,7 +11,7 @@ To use this project, use the following steps:
 
 1. **Clone the Repository:**
    ```sh
-   git clone https://github.com/RotemBenisty/SIMPLE_3Planes.git
+   git clone https://github.com/TechnionComputationalMRILab/SIMPLE.git
 2. **Install Dependencies (via conda)**
    ```sh
    conda env create -f environment.yml
