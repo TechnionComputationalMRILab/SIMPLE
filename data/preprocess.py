@@ -1,4 +1,5 @@
 import SimpleITK as sitk
+import matplotlib.pyplot as plt
 from util.util import mkdir, mkdirs
 import pandas as pd
 import numpy as np
@@ -35,9 +36,9 @@ def convert_image_range(itk_image, min_clamp_val, max_clamp_val, clamp_en=False)
 
     return image
 
-def resample_image(itk_image):
-    original_spacing = list(itk_image.GetSpacing())
+def resample_image(itk_image, plane=None, eval_plane=None, img=None):
     original_size = itk_image.GetSize()
+    original_spacing = list(itk_image.GetSpacing())
     assert original_spacing[0] == original_spacing[1]
     out_spacing = [original_spacing[0], original_spacing[1], original_spacing[0]]
     out_spacing = tuple(out_spacing)
@@ -48,6 +49,7 @@ def resample_image(itk_image):
         int(np.round(original_size[1] * (original_spacing[1] / out_spacing[1]))),
         int(np.round(original_size[2] * (original_spacing[2] / out_spacing[2])))
     ]
+
     resample = sitk.ResampleImageFilter()
     resample.SetOutputSpacing(out_spacing)
     resample.SetSize(out_size)
@@ -60,12 +62,45 @@ def resample_image(itk_image):
 
     return resample.Execute(itk_image)
 
-def extract_volume_from_dicom(case_path, format, _min=0, _max=2048):
+def resample_org_image(itk_image, img=None):
+    original_ax_spacing = list(img.GetSpacing())
+    original_spacing = list(itk_image.GetSpacing())
+    original_size = itk_image.GetSize()
+    assert original_spacing[0] == original_spacing[1]
+    out_spacing = [original_ax_spacing[0], original_ax_spacing[1], original_spacing[2]]
+    out_spacing = tuple(out_spacing)
+    original_spacing = tuple(original_spacing)
+
+    out_size = [
+        int(np.round(original_size[0] * (original_spacing[0] / out_spacing[0]))),
+        int(np.round(original_size[1] * (original_spacing[1] / out_spacing[1]))),
+        int(np.round(original_size[2] * (original_spacing[2] / out_spacing[2])))
+    ]
+
+    resample = sitk.ResampleImageFilter()
+    resample.SetOutputSpacing(out_spacing)
+    resample.SetSize(out_size)
+    resample.SetOutputDirection(itk_image.GetDirection())
+    resample.SetOutputOrigin(itk_image.GetOrigin())
+    resample.SetTransform(sitk.Transform())
+    resample.SetDefaultPixelValue(itk_image.GetPixelIDValue())
+
+    resample.SetInterpolator(sitk.sitkLinear)
+
+    return resample.Execute(itk_image)
+
+def extract_volume_from_dicom(case_path, format, _min=0, _max=2048, clamp_en=True, stride=None, plane=None, eval_plane=None, data_dir=None, case_idx=None, prependicular_case=None):
     img = read_MRI_case(case_path, format)
     interp_img = resample_image(img)
 
-    img = convert_image_range(img, _min, _max, clamp_en=True)
-    interp_img = convert_image_range(interp_img, _min, _max, clamp_en=True)
+    # mkdir(os.path.join(data_dir, 'historgrams'))
+    # create_histogram_(sitk.GetArrayFromImage(img), f'hist_oasis_1_case_{case_idx}', os.path.join(data_dir, 'historgrams'))
+
+    img = convert_image_range(img, _min, _max, clamp_en=clamp_en)
+    interp_img = convert_image_range(interp_img, _min, _max, clamp_en=clamp_en)
+
+    # if plane != eval_plane and stride is not None:
+    #     interp_img = smooth_image(img, plane, eval_plane, stride)
 
     img_nda = sitk.GetArrayFromImage(img)
     interp_img_nda = sitk.GetArrayFromImage(interp_img)
@@ -192,34 +227,34 @@ def combine_patches_3d(x, kernel_size, output_shape, padding=0, stride=1, dilati
 
     return x
 
-#def reconstruct_volume(opt, patches_3d_list, output_shape):
-#    patches_3d = torch.cat(patches_3d_list)
-#    output_vol = combine_patches_3d(patches_3d, opt.patch_size, output_shape,
-#                                    stride=int(opt.patch_size * (1 - opt.overlap_ratio)))
-#
-#    ones = torch.ones_like(patches_3d).cpu()
-#    ones_vol = combine_patches_3d(ones, opt.patch_size, output_shape, stride=int(opt.patch_size * (1 - opt.overlap_ratio)))
-#    recon_vol = output_vol.cpu() / ones_vol
-#
-#    return recon_vol
-
 def reconstruct_volume(opt, patches_3d_list, output_shape):
     overlap = int(opt.patch_size * opt.overlap_ratio)
-    zero = int(overlap / 3)
 
     patches_3d = torch.cat(patches_3d_list)
-    patches_3d[:, :, (opt.patch_size - zero):, (opt.patch_size - zero):, (opt.patch_size - zero):] = 0
+    for i in range(overlap):
+        patches_3d[:, :, i, :, :] *= (i + 1) / (overlap + 1)
+        patches_3d[:, :, :, i, :] *= (i + 1) / (overlap + 1)
+        patches_3d[:, :, :, :, i] *= (i + 1) / (overlap + 1)
+        patches_3d[:, :, -(i + 1), :, :] *= (i + 1) / (overlap + 1)
+        patches_3d[:, :, :, -(i + 1), :] *= (i + 1) / (overlap + 1)
+        patches_3d[:, :, :, :, -(i + 1)] *= (i + 1) / (overlap + 1)
+
     output_vol = combine_patches_3d(patches_3d, opt.patch_size, output_shape,
                                     stride=int(opt.patch_size * (1 - opt.overlap_ratio)))
 
     ones = torch.ones_like(patches_3d).cpu()
-    ones[:, :, (opt.patch_size-zero):, (opt.patch_size-zero):, (opt.patch_size-zero):] = 0
+    for i in range(overlap):
+        ones[:, :, i, :, :] *= (i + 1) / (overlap + 1)
+        ones[:, :, :, i, :] *= (i + 1) / (overlap + 1)
+        ones[:, :, :, :, i] *= (i + 1) / (overlap + 1)
+        ones[:, :, -(i + 1), :, :] *= (i + 1) / (overlap + 1)
+        ones[:, :, :, -(i + 1), :] *= (i + 1) / (overlap + 1)
+        ones[:, :, :, :, -(i + 1)] *= (i + 1) / (overlap + 1)
     ones_vol = combine_patches_3d(ones, opt.patch_size, output_shape, stride=int(opt.patch_size * (1 - opt.overlap_ratio)))
-    ones_vol[ones_vol == 0] = 1
     recon_vol = output_vol.cpu() / ones_vol
 
     return recon_vol
-    
+
 def pad_volume(vol, dim):
     vol = change_dim(vol, dim)
 
@@ -279,16 +314,14 @@ def calc_dims(case, opt):
     return new_dim, old_dim, start_index
 
 def simple_test_preprocess(case, opt):
-    _, _, _, interp_vol_nda = extract_volume_from_dicom(case, opt.data_format, _min=opt.global_min, _max=opt.global_max)
+    _, _, _, interp_vol_nda = extract_volume_from_dicom(case, opt.data_format, _min=opt.global_min, _max=opt.global_max, clamp_en=opt.clamp_en)
 
     interp_vol_nda = change_dim(interp_vol_nda, target_dim=opt.vol_cube_dim)
     interp_vol = torch.from_numpy(interp_vol_nda).to(torch.float32)
-
     new_dim, old_dim, s = calc_dims(interp_vol, opt)
 
     padded_case = torch.zeros((1, 1, new_dim[0], new_dim[1], new_dim[2])) - 1
     padded_case[:, :, s[0]:(s[0] + old_dim[0]), s[1]:(s[1] + old_dim[1]), s[2]:(s[2] + old_dim[2])] = interp_vol
-
     patches_3d = extract_patches_3d(padded_case, kernel_size=opt.patch_size, stride=int(opt.patch_size * (1 - opt.overlap_ratio)))
 
     return patches_3d, padded_case
@@ -296,9 +329,9 @@ def simple_test_preprocess(case, opt):
 
 def simple_train_preprocess(opt):
     df = pd.read_csv(os.path.join(opt.csv_name), low_memory=False)
-    cor_cases_paths = df.loc[:, 'coronal']
+    cases_paths = df.loc[:, opt.eval_plane]
 
-    cases_num = len(cor_cases_paths)
+    cases_num = len(cases_paths)
 
     opt.data_dir = os.path.join(opt.main_root, opt.model_root, 'data')
     save_train_dir = os.path.join(opt.data_dir, 'train')
@@ -306,35 +339,50 @@ def simple_train_preprocess(opt):
     mkdirs([opt.data_dir, save_train_dir])
 
     if opt.global_min == 0 and opt.global_max == 0:
-        opt.global_min, opt.global_max = find_grayscale_limits(cor_cases_paths, opt.data_format)
+        opt.global_min, opt.global_max = find_grayscale_limits(cases_paths, opt.data_format)
 
     save_idx = 0
 
     for case_idx in range(cases_num):
-        cor_case = cor_cases_paths[case_idx]
-        print(f'case no: {case_idx} / {cases_num}, {cor_case=}')
+        case = cases_paths[case_idx]
+        print(f'case no: {case_idx} / {cases_num}, {case=}')
+        half_d = int(opt.patch_size / 2)
 
-        _, _, _, interp_vol_nda = extract_volume_from_dicom(cor_case, opt.data_format, _min=opt.global_min, _max=opt.global_max)
+        _, _, _, interp_vol_nda = extract_volume_from_dicom(case, opt.data_format, _min=opt.global_min, _max=opt.global_max, clamp_en=opt.clamp_en)
         interp_vol_nda = change_dim(interp_vol_nda, target_dim=opt.vol_cube_dim)
         interp_vol = torch.from_numpy(interp_vol_nda).to(torch.float32).cpu().detach()
-
-        cor_atme_vol = torch.load(os.path.join(opt.main_root, opt.atme_cor_root, 'data', 'generation', f'case_{case_idx}', 'atme_vol.pt')).cpu().detach()
-        ax_atme_vol = torch.load(os.path.join(opt.main_root, opt.atme_ax_root, 'data', 'generation', f'case_{case_idx}', 'atme_vol.pt')).cpu().detach()
+        interp_vol = interp_vol[half_d : -half_d, half_d : -half_d, half_d : -half_d]
 
         interp_patches = extract_patches_with_overlap(interp_vol, opt.patch_size, opt.overlap_ratio)
-        cor_atme_patches = extract_patches_with_overlap(cor_atme_vol, opt.patch_size, opt.overlap_ratio)
-        ax_atme_patches = extract_patches_with_overlap(ax_atme_vol, opt.patch_size, opt.overlap_ratio)
+        if 'coronal' in opt.planes:
+            cor_atme_vol = torch.load(os.path.join(opt.main_root, opt.atme_cor_root, 'data', 'generation', f'case_{case_idx}', 'atme_vol.pt')).cpu().detach()
+            cor_atme_vol = cor_atme_vol[half_d : -half_d, half_d : -half_d, half_d : -half_d]
+            cor_atme_patches = extract_patches_with_overlap(cor_atme_vol, opt.patch_size, opt.overlap_ratio)
+            assert (len(interp_patches) == len(cor_atme_patches))
+        if 'axial' in opt.planes:
+            ax_atme_vol = torch.load(os.path.join(opt.main_root, opt.atme_ax_root, 'data', 'generation', f'case_{case_idx}', 'atme_vol.pt')).cpu().detach()
+            ax_atme_vol = ax_atme_vol[half_d : -half_d, half_d : -half_d, half_d : -half_d]
+            ax_atme_patches = extract_patches_with_overlap(ax_atme_vol, opt.patch_size, opt.overlap_ratio)
+            assert (len(interp_patches) == len(ax_atme_patches))
+        if 'sagittal' in opt.planes:
+            sag_atme_vol = torch.load(os.path.join(opt.main_root, opt.atme_sag_root, 'data', 'generation', f'case_{case_idx}', 'atme_vol.pt')).cpu().detach()
+            sag_atme_vol = sag_atme_vol[half_d : -half_d, half_d : -half_d, half_d : -half_d]
+            sag_atme_patches = extract_patches_with_overlap(sag_atme_vol, opt.patch_size, opt.overlap_ratio)
+            assert (len(interp_patches) == len(sag_atme_patches))
 
-        assert(len(interp_patches)==len(cor_atme_patches))
-        assert(len(cor_atme_patches)==len(ax_atme_patches))
 
         for i in range(len(interp_patches)):
             interp_patch = interp_patches[i]['patch'].unsqueeze(0).clone()
-            cor_atme_patch = cor_atme_patches[i]['patch'].unsqueeze(0).clone()
-            ax_atme_patch = ax_atme_patches[i]['patch'].unsqueeze(0).clone()
-
-            data = {'interp_patch': interp_patch, 'cor_atme_patch': cor_atme_patch, 'ax_atme_patch': ax_atme_patch}
-
+            data = {'interp_patch': interp_patch}
+            if 'coronal' in opt.planes:
+                cor_atme_patch = cor_atme_patches[i]['patch'].unsqueeze(0).clone()
+                data['cor_atme_patch'] = cor_atme_patch
+            if 'axial' in opt.planes:
+                ax_atme_patch = ax_atme_patches[i]['patch'].unsqueeze(0).clone()
+                data['ax_atme_patch'] = ax_atme_patch
+            if 'sagittal' in opt.planes:
+                sag_atme_patch = sag_atme_patches[i]['patch'].unsqueeze(0).clone()
+                data['sag_atme_patch'] = sag_atme_patch
             torch.save(data, os.path.join(save_train_dir, f'data_{save_idx}.pt'))
             save_idx += 1
 
@@ -386,37 +434,82 @@ def find_grayscale_limits(cases, data_format='dicom'):
 
     return global_min, global_max
 
-def change_dim(image, target_dim):
-    if len(image.shape) == 2:
-        target_size = (target_dim, target_dim)
-    elif len(image.shape) == 3:
-        target_size = (image.shape[0], target_dim, target_dim)
+def smooth_image(img, plane, eval_plane, stride):
+    dim = None
+    if eval_plane == 'coronal':
+        if plane == 'axial': dim = 1
+        if plane == 'sagittal': dim = 0
+    elif eval_plane == 'axial':
+        if plane == 'sagittal': dim = 1
+        if plane == 'coronal': dim = 1
+    elif eval_plane == 'sagittal':
+        if plane == 'axial': dim = 0
+        if plane == 'coronal': dim = 0
+
+    sigma = max(stride / 2.355, 0.00001)
+
+    image_dimension = img.GetDimension()
+    sigma_array = [0.00001] * image_dimension
+    sigma_array[dim] = sigma
+
+    gaussian_filter = sitk.SmoothingRecursiveGaussianImageFilter()
+    gaussian_filter.SetSigma(sigma_array)
+    smoothed_img = gaussian_filter.Execute(img)
+
+    return smoothed_img
+
+def stride_image(opt, interp_img):
+    stride = None
+    if opt.eval_plane == 'coronal':
+        if opt.plane == 'axial': stride = 'y'
+        if opt.plane == 'sagittal': stride = 'x'
+    elif opt.eval_plane == 'axial':
+        if opt.plane == 'sagittal': stride = 'y'
+        if opt.plane == 'coronal': stride = 'y'
+    elif opt.eval_plane == 'sagittal':
+        if opt.plane == 'axial': stride = 'x'
+        if opt.plane == 'coronal': stride = 'x'
+
+    if stride == None:
+        return interp_img
     else:
-        target_size = None
-        print(f'number of image dimensions is {len(image.shape)} != 2 or 3')
+        strided_interp_img = np.zeros_like(interp_img)
+        if stride == 'x':
+            interp_img = np.transpose(interp_img)
+            strided_interp_img = np.transpose(strided_interp_img)
 
-    current_size = image.shape
+        for k in range(0, opt.vol_cube_dim, opt.stride):
+            strided_interp_img[k:k + opt.stride, :] = interp_img[k, :]
 
-    # Initialize the output array with zeros
-    if 'torch' in str(image.dtype):
-        output_image = torch.zeros(target_size, dtype=image.dtype) - 1
-    else:
-        output_image = np.zeros(target_size, dtype=image.dtype) - 1
+        if stride == 'x':
+            strided_interp_img = np.transpose(strided_interp_img)
 
-    # Calculate the amount to pad or crop for each dimension
-    pad_crop = [((t - c) // 2, (t - c + 1) // 2) for t, c in zip(target_size, current_size)]
+        return strided_interp_img
 
-    input_slices = tuple(slice(max(0, -p[0]), c - max(0, -p[1])) for p, c in zip(pad_crop, current_size))
-    output_slices = tuple(slice(max(0, p[0]), t - max(0, p[1])) for p, t in zip(pad_crop, target_size))
+def create_histogram_(image, title, save_path):
+    total_hist=np.zeros((256,))
 
-    # Copy the data from the input to the output
-    output_image[output_slices] = image[input_slices]
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
 
-    return output_image
+    for i in range(image.shape[0]):
+        histogram,bin_edges=np.histogram(image[i,:,:],bins=256,range=(np.min(image),np.max(image)))
+        total_hist+=histogram
+    plt.figure()
+    plt.title(f'GrayscaleHistogram {title}')
+    plt.xlabel("grayscale value")
+    plt.ylabel("pixel count")
+    plt.xlim([np.min(image),np.max(image)])
+    plt.ylim([0.0,np.max(total_hist)])
+    plt.plot(bin_edges[0:-1],total_hist)
+    plt.savefig(os.path.join(save_path,f'{title}.png'))
+    plt.close()
 
 def atme_train_preprocess(opt):
     df = pd.read_csv(os.path.join(opt.csv_name), low_memory=False)
     cases_paths = df.loc[:, opt.plane]
+    ax_cases_path = df.loc[:, 'axial']
 
     save_idx = 0
 
@@ -425,7 +518,8 @@ def atme_train_preprocess(opt):
 
     for i, case in enumerate(cases_paths):
         print(f'case no: {i} / {len(cases_paths)}, {case=}')
-        org_vol, interp_vol, org_vol_nda, interp_vol_nda = extract_volume_from_dicom(case, opt.data_format, _min=opt.global_min, _max=opt.global_max)
+        ax_case = ax_cases_path[i]
+        org_vol, interp_vol, org_vol_nda, interp_vol_nda = extract_volume_from_dicom(case, opt.data_format, _min=opt.global_min, _max=opt.global_max, clamp_en=opt.clamp_en, stride=opt.stride, plane=opt.plane, eval_plane=opt.eval_plane, data_dir=opt.data_dir, case_idx=i, prependicular_case=ax_case) #eval_case=eval_case) #prependicular_case=ax_case)
 
         org_slices_num = org_vol.GetSize()[2]
         interp_slices_num = interp_vol.GetSize()[2]
@@ -459,19 +553,7 @@ def atme_train_preprocess(opt):
             org_img = change_dim(org_img, target_dim=opt.vol_cube_dim)
             interp_img = change_dim(interp_img, target_dim=opt.vol_cube_dim)
 
-            if opt.plane in ['axial', 'sagittal']:
-                strided_interp_img = np.zeros_like(interp_img)
-                if opt.plane == 'sagittal':
-                    interp_img = np.transpose(interp_img)
-                    strided_interp_img = np.transpose(strided_interp_img)
-                    
-                half = int(np.floor(opt.stride / 2))
-                for k in range(half, opt.vol_cube_dim - half, opt.stride):
-                    strided_interp_img[(k-half):(k + half + 1), :] = interp_img[k, :]
-                    
-                if opt.plane == 'sagittal':
-                    strided_interp_img = np.transpose(strided_interp_img)
-                interp_img = strided_interp_img
+            interp_img = stride_image(opt, interp_img)
 
             org_img = np.expand_dims(org_img, axis=0)
             interp_img = np.expand_dims(interp_img, axis=0)

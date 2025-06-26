@@ -21,8 +21,8 @@ def create_simple_train_dataset(opt):
     if opt.calculate_dataset or empty_data_dir:
         simple_train_preprocess(opt)
 
-    dataset = SimpleTrainDataset(os.path.join(opt.data_dir, 'train'))
-    print('The number of training images = %d' % len(dataset))
+    dataset = SimpleTrainDataset(os.path.join(opt.data_dir, 'train'), opt)
+    print('The number of training data = %d' % len(dataset))
 
     data_loader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=True, num_workers=4, persistent_workers=True)
     return data_loader
@@ -52,14 +52,15 @@ def create_atme_train_dataset(opt):
     data_loader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=True, num_workers=4, persistent_workers=True)
     return data_loader
 
-def create_atme_test_dataset(opt, case, case_index):
-    dataset = AtmeTestDataset(opt, case, case_index)
+def create_atme_test_dataset(opt, case, case_index, ax_case):
+    dataset = AtmeTestDataset(opt, case, case_index, ax_case)
     data_loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4, persistent_workers=True)
     return data_loader
 
 class SimpleTrainDataset(Dataset):
-    def __init__(self, path, transform=None, target_transform=None):
+    def __init__(self, path, opt, transform=None, target_transform=None):
         self.path = path
+        self.opt = opt
         self.transform = transform
         self.target_transform = target_transform
 
@@ -68,16 +69,22 @@ class SimpleTrainDataset(Dataset):
 
     def __getitem__(self, idx):
         data = torch.load(os.path.join(self.path, f'data_{idx}.pt'))
-        cor_interp_3d = data["interp_patch"]
-        cor_gen_3d = data["cor_atme_patch"]
-        cor_samp_3d = data["ax_atme_patch"]
+        interp_3d = data["interp_patch"]
+        if self.transform is not None: interp_3d = self.transform(interp_3d)
+        ret_dict = {'Interpolation': interp_3d}
 
-        if self.transform is not None:
-            cor_interp_3d = self.transform(cor_interp_3d)
-            cor_samp_3d = self.transform(cor_samp_3d)
-            cor_gen_3d = self.transform(cor_gen_3d)
-
-        ret_dict = {'A': cor_interp_3d, 'B': cor_gen_3d, 'C': cor_samp_3d}
+        if 'coronal' in self.opt.planes:
+            cor_gen_3d = data["cor_atme_patch"]
+            if self.transform is not None: cor_gen_3d = self.transform(cor_gen_3d)
+            ret_dict['Coronal'] = cor_gen_3d
+        if 'axial' in self.opt.planes:
+            ax_gen_3d = data["ax_atme_patch"]
+            if self.transform is not None: ax_gen_3d = self.transform(ax_gen_3d)
+            ret_dict['Axial'] = ax_gen_3d
+        if 'sagittal' in self.opt.planes:
+            sag_gen_3d = data["sag_atme_patch"]
+            if self.transform is not None: sag_gen_3d = self.transform(sag_gen_3d)
+            ret_dict['Sagittal'] = sag_gen_3d
 
         return ret_dict
 
@@ -96,7 +103,7 @@ class SimpleTestDataset(Dataset):
         if self.transform is not None:
             interp_patch_3d = self.transform(interp_patch_3d)
 
-        ret_dict = {'A': interp_patch_3d}
+        ret_dict = {'Interpolation': interp_patch_3d}
 
         return ret_dict
 
@@ -126,16 +133,17 @@ class AtmeTrainDataset(Dataset):
         return ret_dict
 
 class AtmeTestDataset(Dataset):
-    def __init__(self, opt, case, case_index, transform=None, target_transform=None):
-        _, _, _, case_interp_vol = extract_volume_from_dicom(case, opt.data_format, _min=opt.global_min, _max=opt.global_max)
+    def __init__(self, opt, case, case_index, ax_case, transform=None, target_transform=None):
+        _, _, _, case_interp_vol = extract_volume_from_dicom(case, opt.data_format, _min=opt.global_min, _max=opt.global_max, clamp_en=opt.clamp_en, prependicular_case=ax_case)
         case_interp_vol = change_dim(case_interp_vol, target_dim=opt.vol_cube_dim)
         self.case_interp_vol = torch.from_numpy(case_interp_vol).to(torch.float32)
         self.plane = opt.plane
+        self.eval_plane = opt.eval_plane
         self.start_idx = None
         self.end_idx = None
         self.case_index = case_index
         self.dim = opt.vol_cube_dim
-        if self.plane == 'axial': self.case_interp_vol = self.pad_vol()
+        self.case_interp_vol = self.pad_vol()
         self.transform = transform
         self.target_transform = target_transform
 
@@ -165,10 +173,49 @@ class AtmeTestDataset(Dataset):
             self.end_idx = self.start_idx + self.dim
             padding_case = self.case_interp_vol[self.start_idx:self.end_idx, :, :]
 
-        return torch.movedim(padding_case, (0, 1, 2), (1, 0, 2))
+        if self.eval_plane == 'coronal':
+            if self.plane == 'axial':
+                return torch.movedim(padding_case, (0, 1, 2), (1, 0, 2))
+            elif self.plane == 'sagittal':
+                return torch.movedim(padding_case, (0, 1, 2), (2, 1, 0))
+            elif self.plane == 'coronal':
+                return padding_case
+
+        elif self.eval_plane == 'axial':
+            if self.plane == 'coronal':
+                return torch.movedim(padding_case, (0, 1, 2), (1, 0, 2))
+            elif self.plane == 'sagittal':
+                return torch.movedim(padding_case, (0, 1, 2), (1, 2, 0))
+            elif self.plane == 'axial':
+                return padding_case
+
+        elif self.eval_plane == 'sagittal':
+            if self.plane == 'coronal':
+                return torch.movedim(padding_case, (0, 1, 2), (2, 1, 0))
+            elif self.plane == 'axial':
+                return torch.movedim(padding_case, (0, 1, 2), (2, 0, 1))
+            elif self.plane == 'sagittal':
+                return padding_case
 
     def crop_volume(self, vol):
-        vol = torch.movedim(vol, (0, 1, 2), (1, 0, 2))
+        if self.eval_plane == 'coronal':
+            if self.plane == 'axial':
+                vol = torch.movedim(vol, (0, 1, 2), (1, 0, 2))
+            elif self.plane == 'sagittal':
+                vol = torch.movedim(vol, (0, 1, 2), (2, 1, 0))
+
+        elif self.eval_plane == 'axial':
+            if self.plane == 'coronal':
+                vol = torch.movedim(vol, (0, 1, 2), (1, 0, 2))
+            elif self.plane == 'sagittal':
+                vol = torch.movedim(vol, (0, 1, 2), (2, 0, 1))
+
+        elif self.eval_plane == 'sagittal':
+            if self.plane == 'coronal':
+                vol = torch.movedim(vol, (0, 1, 2), (2, 1, 0))
+            elif self.plane == 'axial':
+                vol = torch.movedim(vol, (0, 1, 2), (1, 2, 0))
+
         if self.end_idx > self.dim:
             return vol
         else:
